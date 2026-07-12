@@ -1,8 +1,11 @@
 import cors from "cors";
 import express from "express";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import { closeFromDb, expenseFromDb, movementFromDb, productFromDb, saleFromDb } from "./mappers.js";
 import { storeId, supabase, unwrap } from "./supabase.js";
 import { httpError, number, text } from "./validation.js";
+import { requireAuth, requireRole } from "./auth.js";
 
 const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
@@ -27,12 +30,20 @@ async function loadClose(id) {
 
 export function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
+  app.use(helmet());
   app.use(cors({ origin: process.env.FRONTEND_ORIGIN?.split(",") ?? "http://localhost:8080" }));
   app.use(express.json({ limit: "100kb" }));
+  app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
 
   app.get("/api/health", asyncRoute(async (_req, res) => {
     unwrap(await supabase.from("stores").select("id").eq("id", storeId).single());
     res.json({ status: "ok", database: "supabase" });
+  }));
+
+  app.use("/api", requireAuth);
+  app.get("/api/auth/me", (req, res) => res.json({
+    id: req.auth.userId, email: req.auth.email, fullName: req.auth.fullName, role: req.auth.role
   }));
 
   app.get("/api/store", asyncRoute(async (_req, res) => {
@@ -56,20 +67,20 @@ export function createApp() {
     });
   }));
 
-  app.post("/api/products", asyncRoute(async (req, res) => {
+  app.post("/api/products", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     if (!categories.includes(req.body.category)) throw httpError(400, "Categoría inválida");
     const values = {
-      store_id: storeId, code: text(req.body.code, "Código"), name: text(req.body.name, "Nombre"),
+      store_id: storeId, name: text(req.body.name, "Nombre"),
       category: req.body.category, price: number(req.body.price, "Precio"), stock: number(req.body.stock, "Stock"),
       min_stock: number(req.body.minStock, "Stock mínimo"), image_url: req.body.image || null
     };
     res.status(201).json(productFromDb(unwrap(await supabase.from("products").insert(values).select().single())));
   }));
 
-  app.put("/api/products/:id", asyncRoute(async (req, res) => {
+  app.put("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     if (!categories.includes(req.body.category)) throw httpError(400, "Categoría inválida");
     const values = {
-      code: text(req.body.code, "Código"), name: text(req.body.name, "Nombre"), category: req.body.category,
+      name: text(req.body.name, "Nombre"), category: req.body.category,
       price: number(req.body.price, "Precio"), stock: number(req.body.stock, "Stock"),
       min_stock: number(req.body.minStock, "Stock mínimo"), image_url: req.body.image || null
     };
@@ -77,12 +88,12 @@ export function createApp() {
     res.json(productFromDb(unwrap(result)));
   }));
 
-  app.delete("/api/products/:id", asyncRoute(async (req, res) => {
+  app.delete("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     unwrap(await supabase.from("products").update({ active: false }).eq("store_id", storeId).eq("id", req.params.id).select("id").single());
     res.status(204).end();
   }));
 
-  app.post("/api/movements", asyncRoute(async (req, res) => {
+  app.post("/api/movements", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     if (!['entrada', 'salida'].includes(req.body.type)) throw httpError(400, "Tipo de movimiento inválido");
     const quantity = number(req.body.quantity, "Cantidad", 1);
     if (!Number.isInteger(quantity)) throw httpError(400, "La cantidad debe ser entera");
@@ -90,6 +101,7 @@ export function createApp() {
       requested_store_id: storeId, requested_product_id: req.body.productId,
       movement_type: req.body.type, movement_quantity: quantity, movement_note: req.body.note || null
     }));
+    await supabase.from("inventory_movements").update({ created_by: req.auth.userId }).eq("id", firstRow(movement).id);
     res.status(201).json(movementFromDb(firstRow(movement)));
   }));
 
@@ -103,22 +115,24 @@ export function createApp() {
       discount_percent: number(req.body.discount ?? 0, "Descuento"),
       requested_cash_received: req.body.paymentMethod === "efectivo" ? number(req.body.cashReceived, "Efectivo recibido") : null
     }));
+    await supabase.from("sales").update({ sold_by: req.auth.userId }).eq("id", created.id);
     res.status(201).json(await loadSale(created.id));
   }));
 
   app.post("/api/expenses", asyncRoute(async (req, res) => {
-    const values = { store_id: storeId, description: text(req.body.description, "Descripción"), amount: number(req.body.amount, "Monto", 0.01) };
+    const values = { store_id: storeId, created_by: req.auth.userId, description: text(req.body.description, "Descripción"), amount: number(req.body.amount, "Monto", 0.01) };
     res.status(201).json(expenseFromDb(unwrap(await supabase.from("expenses").insert(values).select().single())));
   }));
 
-  app.delete("/api/expenses/:id", asyncRoute(async (req, res) => {
+  app.delete("/api/expenses/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     const deleted = unwrap(await supabase.rpc("delete_open_expense", { requested_store_id: storeId, requested_expense_id: req.params.id }));
     if (!deleted) throw httpError(409, "El gasto no existe o ya fue incluido en un cierre de caja");
     res.status(204).end();
   }));
 
-  app.post("/api/cash-closes", asyncRoute(async (req, res) => {
+  app.post("/api/cash-closes", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     const created = unwrap(await supabase.rpc("close_cash", { requested_store_id: storeId, requested_actual_cash: number(req.body.actualCash, "Efectivo real") }));
+    await supabase.from("cash_closes").update({ closed_by: req.auth.userId }).eq("id", firstRow(created).id);
     res.status(201).json(await loadClose(firstRow(created).id));
   }));
 

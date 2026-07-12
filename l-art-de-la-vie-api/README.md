@@ -2,7 +2,7 @@
 
 ## 1. Preparar Supabase
 
-Ejecuta `supabase/migrations/202607120001_initial_schema.sql` una sola vez desde **SQL Editor**.
+Ejecuta en orden todas las migraciones de `supabase/migrations` una sola vez desde **SQL Editor**.
 
 ## 2. Configurar el backend
 
@@ -28,3 +28,5 @@ Comprueba `http://localhost:3000/api/health`. Debe responder `{ "status": "ok", 
 `React (puerto 8080) → Express (puerto 3000) → Supabase/PostgreSQL`
 
 Express valida los datos y transforma los nombres de columnas SQL al formato que ya usaba el frontend.
+
+Todas las rutas bajo `/api`, excepto `/api/health`, requieren `Authorization: Bearer <token>`. El servidor valida el token con Supabase Auth y aplica el rol registrado en `store_members`.
