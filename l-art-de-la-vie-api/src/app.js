@@ -36,6 +36,12 @@ export function createApp() {
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
 
+  app.get("/", (_req, res) => res.json({
+    name: "L'Art de la Vie API",
+    status: "online",
+    health: "/api/health"
+  }));
+
   app.get("/api/health", asyncRoute(async (_req, res) => {
     unwrap(await supabase.from("stores").select("id").eq("id", storeId).single());
     res.json({ status: "ok", database: "supabase" });
