@@ -269,6 +269,8 @@ Después:
 |---|---|---|
 | GET | `/` | Información del backend |
 | GET | `/api/health` | Comprueba API y Supabase |
+| GET | `/api-docs` | Interfaz Swagger/OpenAPI |
+| GET | `/api-docs.json` | Especificación OpenAPI en JSON |
 | GET | `/api/auth/me` | Usuario y rol actuales |
 | GET | `/api/store` | Estado completo de la tienda |
 | POST | `/api/cash-openings` | Apertura diaria |
@@ -280,6 +282,8 @@ Después:
 | POST | `/api/expenses` | Registrar gasto |
 | DELETE | `/api/expenses/:id` | Eliminar gasto abierto |
 | POST | `/api/cash-closes` | Cerrar caja |
+
+Swagger en producción: `https://l-art-de-la-vie.onrender.com/api-docs`.
 
 `/api` es una convención definida por el proyecto. Render solo proporciona el dominio.
 

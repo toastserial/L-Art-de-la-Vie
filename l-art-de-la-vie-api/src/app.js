@@ -2,6 +2,9 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { readFileSync } from "node:fs";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yaml";
 import { closeFromDb, expenseFromDb, movementFromDb, openingFromDb, productFromDb, saleFromDb } from "./mappers.js";
 import { storeId, supabase, unwrap } from "./supabase.js";
 import { httpError, number, text } from "./validation.js";
@@ -9,6 +12,7 @@ import { requireAuth, requireRole } from "./auth.js";
 
 const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
+const openApiDocument = YAML.parse(readFileSync(new URL("../docs/openapi.yaml", import.meta.url), "utf8"));
 
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const firstRow = (value) => Array.isArray(value) ? value[0] : value;
@@ -43,6 +47,12 @@ export function createApp() {
   }));
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
+
+  app.get("/api-docs.json", (_req, res) => res.json(openApiDocument));
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiDocument, {
+    customSiteTitle: "L'Art de la Vie API",
+    swaggerOptions: { persistAuthorization: true, displayRequestDuration: true }
+  }));
 
   app.get("/", (_req, res) => res.json({
     name: "L'Art de la Vie API",

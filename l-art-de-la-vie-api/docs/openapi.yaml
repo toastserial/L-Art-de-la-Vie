@@ -1,0 +1,396 @@
+openapi: 3.0.3
+info:
+  title: L'Art de la Vie API
+  version: 1.0.0
+  description: |
+    API REST del punto de venta L'Art de la Vie.
+    Las rutas protegidas requieren el access token JWT entregado por Supabase Auth.
+    En Swagger UI usa **Authorize** y pega solamente el token, sin escribir `Bearer`.
+servers:
+  - url: https://l-art-de-la-vie.onrender.com
+    description: Producción
+  - url: http://localhost:3000
+    description: Desarrollo local
+tags:
+  - name: Sistema
+  - name: Autenticación
+  - name: Tienda
+  - name: Caja
+  - name: Productos
+  - name: Inventario
+  - name: Ventas
+  - name: Gastos
+security:
+  - bearerAuth: []
+paths:
+  /:
+    get:
+      tags: [Sistema]
+      summary: Información básica de la API
+      security: []
+      responses:
+        '200':
+          description: API activa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name: { type: string, example: "L'Art de la Vie API" }
+                  status: { type: string, example: online }
+                  health: { type: string, example: /api/health }
+  /api/health:
+    get:
+      tags: [Sistema]
+      summary: Comprueba Express y la conexión con Supabase
+      security: []
+      responses:
+        '200':
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  database: { type: string, example: supabase }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Devuelve el usuario autenticado y su rol
+      responses:
+        '200':
+          description: Usuario actual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/store:
+    get:
+      tags: [Tienda]
+      summary: Obtiene todo el estado necesario para el frontend
+      responses:
+        '200':
+          description: Estado de la tienda
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoreData' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/cash-openings:
+    post:
+      tags: [Caja]
+      summary: Abre la caja del día
+      description: Solo puede existir una apertura por tienda y fecha de negocio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [openingCash]
+              properties:
+                openingCash: { type: number, format: double, minimum: 0, example: 500 }
+                note: { type: string, example: Fondo entregado por administración }
+      responses:
+        '201':
+          description: Caja abierta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashOpening' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/cash-closes:
+    post:
+      tags: [Caja]
+      summary: Cierra la caja del día
+      description: Requiere rol owner o admin y una apertura previa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actualCash]
+              properties:
+                actualCash: { type: number, format: double, minimum: 0, example: 1300 }
+      responses:
+        '201':
+          description: Cierre registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashClose' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/products:
+    post:
+      tags: [Productos]
+      summary: Crea un producto
+      description: Requiere owner o admin. PostgreSQL genera el código automáticamente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Productos]
+      summary: Actualiza un producto
+      description: El código existente se conserva.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '200':
+          description: Producto actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Productos]
+      summary: Desactiva un producto
+      description: Es un borrado lógico para conservar historiales.
+      responses:
+        '204': { description: Producto desactivado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/movements:
+    post:
+      tags: [Inventario]
+      summary: Registra una entrada o salida manual
+      description: Requiere owner o admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, type, quantity]
+              properties:
+                productId: { type: string, format: uuid }
+                type: { type: string, enum: [entrada, salida] }
+                quantity: { type: integer, minimum: 1, example: 5 }
+                note: { type: string, example: Reposición de proveedor }
+      responses:
+        '201':
+          description: Movimiento registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryMovement' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/sales:
+    post:
+      tags: [Ventas]
+      summary: Completa una venta
+      description: Requiere caja abierta. Precios, stock, descuento y cambio se validan en servidor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items, paymentMethod]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [productId, quantity]
+                    properties:
+                      productId: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 1 }
+                paymentMethod: { type: string, enum: [efectivo, tarjeta, transferencia] }
+                discount: { type: number, minimum: 0, maximum: 100, example: 0 }
+                cashReceived: { type: number, minimum: 0, example: 1000 }
+      responses:
+        '201':
+          description: Venta completada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sale' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/expenses:
+    post:
+      tags: [Gastos]
+      summary: Registra un gasto del día
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description, amount]
+              properties:
+                description: { type: string, example: Compra de bolsas }
+                amount: { type: number, format: double, minimum: 0.01, example: 75 }
+      responses:
+        '201':
+          description: Gasto registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/expenses/{id}:
+    delete:
+      tags: [Gastos]
+      summary: Elimina un gasto todavía no cerrado
+      description: Requiere owner o admin.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': { description: Gasto eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de una sesión de Supabase Auth.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Datos inválidos
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Sesión ausente o inválida
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Usuario sin permiso
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Recurso no encontrado
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Conflicto con el estado actual
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    InternalError:
+      description: Error interno
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    AppUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        fullName: { type: string }
+        role: { type: string, enum: [owner, admin, cashier] }
+    ProductInput:
+      type: object
+      required: [name, category, price, stock, minStock]
+      properties:
+        name: { type: string, example: Vela aromática }
+        category: { type: string, enum: [Decoración, Perfumes, Carteras, Varios] }
+        price: { type: number, format: double, minimum: 0, example: 250 }
+        stock: { type: integer, minimum: 0, example: 10 }
+        minStock: { type: integer, minimum: 0, example: 3 }
+        image: { type: string, format: uri }
+    Product:
+      allOf:
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string, example: DEC-004 }
+        - $ref: '#/components/schemas/ProductInput'
+    SaleItem:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        subtotal: { type: number }
+    Sale:
+      type: object
+      properties:
+        id: { type: string, example: S006 }
+        date: { type: string, format: date-time }
+        items: { type: array, items: { $ref: '#/components/schemas/SaleItem' } }
+        subtotal: { type: number }
+        discount: { type: number }
+        total: { type: number }
+        paymentMethod: { type: string, enum: [efectivo, tarjeta, transferencia] }
+        cashReceived: { type: number }
+        change: { type: number }
+    InventoryMovement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        type: { type: string, enum: [entrada, salida, venta] }
+        quantity: { type: integer }
+        date: { type: string, format: date-time }
+        note: { type: string }
+    Expense:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        description: { type: string }
+        amount: { type: number }
+        date: { type: string, format: date-time }
+    CashOpening:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        openingCash: { type: number }
+        openedAt: { type: string, format: date-time }
+        note: { type: string }
+    CashClose:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        openingCash: { type: number }
+        totalSales: { type: number }
+        salesByMethod:
+          type: object
+          properties:
+            efectivo: { type: number }
+            tarjeta: { type: number }
+            transferencia: { type: number }
+        expectedCash: { type: number }
+        actualCash: { type: number }
+        difference: { type: number }
+        expenses: { type: array, items: { $ref: '#/components/schemas/Expense' } }
+        totalExpenses: { type: number }
+    StoreData:
+      type: object
+      properties:
+        products: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        sales: { type: array, items: { $ref: '#/components/schemas/Sale' } }
+        movements: { type: array, items: { $ref: '#/components/schemas/InventoryMovement' } }
+        cashCloses: { type: array, items: { $ref: '#/components/schemas/CashClose' } }
+        todayExpenses: { type: array, items: { $ref: '#/components/schemas/Expense' } }
+        cashOpening:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/CashOpening' }]

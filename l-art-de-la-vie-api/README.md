@@ -23,6 +23,9 @@ npm run dev
 
 Comprueba `http://localhost:3000/api/health`. Debe responder `{ "status": "ok", "database": "supabase" }`.
 
+Documentación Swagger local: `http://localhost:3000/api-docs`.
+OpenAPI JSON: `http://localhost:3000/api-docs.json`.
+
 ## Flujo
 
 `React (puerto 8080) → Express (puerto 3000) → Supabase/PostgreSQL`
