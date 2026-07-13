@@ -590,3 +590,233 @@ Para cada pieza, responder:
 ```
 
 Si puedes responder esas preguntas, entiendes la estructura aunque todavía no memorices la sintaxis.
+
+---
+
+## 15. Swagger / OpenAPI explicado desde cero
+
+### ¿Qué es?
+
+Swagger es una pantalla que muestra las puertas disponibles del backend.
+
+```text
+Frontend usa la API
+        │
+        ▼
+Swagger documenta la API
+        │
+        ▼
+Express ejecuta la API
+```
+
+Swagger no reemplaza al backend, no guarda datos y no crea las rutas. Solo lee el archivo OpenAPI y presenta las rutas existentes de una forma navegable.
+
+### Ubicaciones
+
+Producción:
+
+```text
+https://l-art-de-la-vie.onrender.com/api-docs
+```
+
+OpenAPI en formato JSON:
+
+```text
+https://l-art-de-la-vie.onrender.com/api-docs.json
+```
+
+Desarrollo local:
+
+```text
+http://localhost:3000/api-docs
+```
+
+El archivo fuente está en:
+
+```text
+l-art-de-la-vie-api/docs/openapi.yaml
+```
+
+### Relación entre los archivos
+
+```text
+openapi.yaml
+   │ describe rutas, modelos y errores
+   ▼
+swagger-ui-express
+   │ convierte la descripción en una página web
+   ▼
+/api-docs
+```
+
+### Cómo leer una ruta en Swagger
+
+Ejemplo:
+
+```text
+POST /api/sales
+```
+
+- `POST`: se enviará información nueva.
+- `/api`: grupo de rutas del backend.
+- `/sales`: operación relacionada con ventas.
+- `Request body`: datos que debes enviar.
+- `Responses`: posibles resultados.
+- `201`: venta creada.
+- `400`: datos inválidos.
+- `401`: no existe sesión válida.
+- `409`: conflicto, por ejemplo caja cerrada o stock insuficiente.
+
+### Colores habituales
+
+```text
+GET     → consultar
+POST    → crear o ejecutar
+PUT     → actualizar completamente
+DELETE  → eliminar o desactivar
+```
+
+### Por qué Swagger solicita autorización
+
+Casi todas las rutas están protegidas. El backend espera:
+
+```http
+Authorization: Bearer ACCESS_TOKEN
+```
+
+El access token es la prueba temporal de que un usuario inició sesión.
+
+### Cómo obtener el token para estudiar y probar
+
+1. Inicia sesión normalmente en el POS.
+2. Abre las herramientas del navegador con `F12`.
+3. Entra en `Application`.
+4. Abre `Local Storage`.
+5. Selecciona el dominio del POS.
+6. Busca una clave similar a:
+
+```text
+sb-fctoxbgsjwfppzpljnav-auth-token
+```
+
+7. Dentro del JSON busca:
+
+```json
+{
+  "access_token": "TOKEN-TEMPORAL"
+}
+```
+
+8. Copia únicamente el contenido de `access_token`.
+9. Abre `/api-docs`.
+10. Pulsa **Authorize**.
+11. Pega el token sin escribir la palabra `Bearer`.
+12. Pulsa **Authorize** y cierra la ventana.
+
+No compartas el token. Aunque expira, representa tu sesión mientras siga válido.
+
+### Cómo probar sin causar daños
+
+Empieza con rutas de lectura:
+
+```text
+GET /api/health
+GET /api/auth/me
+GET /api/store
+```
+
+Proceso:
+
+1. Abre una ruta.
+2. Pulsa **Try it out**.
+3. Pulsa **Execute**.
+4. Observa `Request URL`.
+5. Observa `Response code`.
+6. Lee `Response body`.
+
+Evita inicialmente ejecutar desde Swagger:
+
+```text
+POST /api/sales
+POST /api/cash-closes
+DELETE /api/products/{id}
+DELETE /api/expenses/{id}
+```
+
+Estas rutas modifican datos reales de producción.
+
+### Swagger en versión mono
+
+```text
+Express tiene puertas.
+OpenAPI escribe el mapa de puertas.
+Swagger enseña el mapa bonito.
+Token entrega la llave.
+Try it out abre una puerta real.
+```
+
+---
+
+## 16. Qué hacer cuando todo empieza a mezclarse
+
+No intentes sostener toda la aplicación en la memoria. Identifica primero en qué capa estás.
+
+```text
+¿Estoy viendo una pantalla?
+→ Frontend React
+
+¿Estoy enviando/recibiendo una solicitud?
+→ API / Express
+
+¿Estoy guardando o consultando datos?
+→ PostgreSQL / Supabase
+
+¿Estoy publicando una versión?
+→ GitHub / Vercel / Render
+
+¿Estoy entrando con usuario y contraseña?
+→ Supabase Auth
+```
+
+### Método de diagnóstico de cinco preguntas
+
+Cuando algo falle, escribe:
+
+1. ¿Qué estaba intentando hacer?
+2. ¿Qué pantalla o archivo participa?
+3. ¿Qué endpoint se llamó?
+4. ¿Qué código HTTP regresó?
+5. ¿En qué plataforma están los logs?
+
+Ejemplo:
+
+```text
+Intento: iniciar sesión
+Pantalla: Login.tsx
+Endpoint: /api/auth/me
+Código: CORS / request bloqueada
+Logs: navegador + Render
+```
+
+### Sesión de estudio recomendada
+
+```text
+25 minutos: estudiar una sola pieza
+5 minutos: caminar, tomar agua, mirar lejos
+25 minutos: seguir un solo flujo
+10 minutos: escribir un resumen propio
+```
+
+Si llevas varias horas, descansar no es perder tiempo. La memoria organiza conceptos durante las pausas. Volver descansado suele resolver en minutos algo que agotado parece imposible.
+
+### Orden mínimo para retomar mañana
+
+```text
+1. Leer arquitectura general.
+2. Elegir un flujo: login, venta o caja.
+3. Seguir solamente ese flujo.
+4. Probar sus GET en Swagger.
+5. Anotar con tus palabras qué entra y qué sale.
+```
+
+No necesitas entender hoy cada componente UI ni cada línea SQL. Tu objetivo inicial es reconocer el camino de los datos.
