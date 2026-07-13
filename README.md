@@ -2,6 +2,8 @@
 
 Sistema privado de punto de venta con React, Express y Supabase.
 
+Documentación detallada de arquitectura, componentes, base de datos, Git y despliegue: [`docs/SYSTEM_GUIDE.md`](docs/SYSTEM_GUIDE.md).
+
 ## Configuración inicial
 
 ### 1. Base de datos
