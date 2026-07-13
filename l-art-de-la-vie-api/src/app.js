@@ -30,9 +30,17 @@ async function loadClose(id) {
 
 export function createApp() {
   const app = express();
+  const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:8080")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""));
   app.set("trust proxy", 1);
   app.use(helmet());
-  app.use(cors({ origin: process.env.FRONTEND_ORIGIN?.split(",") ?? "http://localhost:8080" }));
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
+      return callback(httpError(403, "Origen no permitido por CORS"));
+    }
+  }));
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
 
