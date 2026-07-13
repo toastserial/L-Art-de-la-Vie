@@ -50,6 +50,15 @@ export interface CashClose {
   difference: number;
   expenses: Expense[];
   totalExpenses: number;
+  openingCash: number;
+}
+
+export interface CashOpening {
+  id: string;
+  date: string;
+  openingCash: number;
+  openedAt: string;
+  note?: string;
 }
 
 export interface Expense {

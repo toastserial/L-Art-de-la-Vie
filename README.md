@@ -12,6 +12,7 @@ En Supabase → **SQL Editor**, ejecuta en orden los archivos de `l-art-de-la-vi
 2. `202607120002_delete_open_expense.sql`
 3. `202607120003_auth_bootstrap.sql`
 4. `202607120004_auto_product_codes.sql`
+5. `202607120005_cash_openings.sql`
 
 ### 2. Primer usuario
 

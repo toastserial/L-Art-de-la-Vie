@@ -26,8 +26,14 @@ export const expenseFromDb = (row) => ({
   id: row.id, description: row.description, amount: Number(row.amount), date: row.created_at
 });
 
+export const openingFromDb = (row) => ({
+  id: row.id, date: row.business_date, openingCash: Number(row.opening_cash),
+  note: row.note || undefined, openedAt: row.created_at
+});
+
 export const closeFromDb = (row) => ({
   id: row.id, date: row.business_date, totalSales: Number(row.total_sales),
+  openingCash: Number(row.opening_cash),
   salesByMethod: { efectivo: Number(row.cash_sales), tarjeta: Number(row.card_sales), transferencia: Number(row.transfer_sales) },
   expectedCash: Number(row.expected_cash), actualCash: Number(row.actual_cash), difference: Number(row.difference),
   expenses: (row.cash_close_expenses ?? []).map((link) => expenseFromDb(link.expenses)),

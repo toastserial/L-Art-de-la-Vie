@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { supabaseConfigError } from "@/lib/supabase";
 import { StoreProvider, useStore } from "@/context/StoreContext";
 import { AppLayout } from "@/components/AppLayout";
+import { CashOpeningDialog } from "@/components/CashOpeningDialog";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import POS from "./pages/POS";
@@ -32,7 +33,7 @@ function ProtectedApp() {
   const { user, loading } = useAuth();
   if (loading) return <FullScreenMessage><p className="text-muted-foreground">Verificando sesión...</p></FullScreenMessage>;
   if (!user) return <Navigate to="/login" replace />;
-  return <StoreProvider><StoreGate><AppLayout><Routes><Route path="/" element={<Dashboard />} /><Route path="/inventario" element={<Inventory />} /><Route path="/pos" element={<POS />} /><Route path="/cierre" element={<CashClose />} /><Route path="*" element={<NotFound />} /></Routes></AppLayout></StoreGate></StoreProvider>;
+  return <StoreProvider><StoreGate><CashOpeningDialog /><AppLayout><Routes><Route path="/" element={<Dashboard />} /><Route path="/inventario" element={<Inventory />} /><Route path="/pos" element={<POS />} /><Route path="/cierre" element={<CashClose />} /><Route path="*" element={<NotFound />} /></Routes></AppLayout></StoreGate></StoreProvider>;
 }
 
 export default function App() {

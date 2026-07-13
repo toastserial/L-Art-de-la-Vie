@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 
 export default function CashClose() {
-  const { sales, cashCloses, todayExpenses, closeCash, addExpense, deleteExpense } = useStore();
+  const { sales, cashCloses, todayExpenses, cashOpening, closeCash, addExpense, deleteExpense } = useStore();
   const { toast } = useToast();
   const { canManage } = useAuth();
   const [actualCash, setActualCash] = useState(0);
@@ -36,7 +36,8 @@ export default function CashClose() {
     transferencia: todaySales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0),
   };
   const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const expectedCash = byMethod.efectivo - totalExpenses;
+  const openingCash = cashOpening?.openingCash ?? 0;
+  const expectedCash = openingCash + byMethod.efectivo - totalExpenses;
   const difference = actualCash - expectedCash;
 
   const handleAddExpense = async () => {
@@ -81,7 +82,14 @@ export default function CashClose() {
 
         <TabsContent value="today" className="space-y-6">
           {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-sans font-medium text-muted-foreground">Fondo Inicial</CardTitle>
+                <Wallet className="h-4 w-4 text-accent" />
+              </CardHeader>
+              <CardContent><p className="text-2xl font-bold font-sans">L {openingCash.toFixed(2)}</p></CardContent>
+            </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-sans font-medium text-muted-foreground">Efectivo</CardTitle>
@@ -177,6 +185,9 @@ export default function CashClose() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between"><span>Total Ventas</span><span className="font-bold">L {totalToday.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Fondo Inicial</span><span>L {openingCash.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Ventas en Efectivo</span><span>L {byMethod.efectivo.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Gastos</span><span className="text-destructive">-L {totalExpenses.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span>Efectivo Esperado</span><span className="font-bold">L {expectedCash.toFixed(2)}</span></div>
                   </div>
                   <Separator />
@@ -223,6 +234,7 @@ export default function CashClose() {
                   <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead className="text-right">Ventas</TableHead>
+                    <TableHead className="text-right">Fondo Inicial</TableHead>
                     <TableHead className="text-right">Gastos</TableHead>
                     <TableHead className="text-right">Efectivo Esperado</TableHead>
                     <TableHead className="text-right">Efectivo Real</TableHead>
@@ -234,6 +246,7 @@ export default function CashClose() {
                     <TableRow key={cc.id}>
                       <TableCell>{new Date(cc.date).toLocaleDateString("es")}</TableCell>
                       <TableCell className="text-right">${cc.totalSales.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">L {cc.openingCash.toFixed(2)}</TableCell>
                       <TableCell className="text-right text-destructive">${cc.totalExpenses.toFixed(2)}</TableCell>
                       <TableCell className="text-right">${cc.expectedCash.toFixed(2)}</TableCell>
                       <TableCell className="text-right">${cc.actualCash.toFixed(2)}</TableCell>
@@ -245,7 +258,7 @@ export default function CashClose() {
                     </TableRow>
                   ))}
                   {cashCloses.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">Sin cierres registrados</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-4">Sin cierres registrados</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

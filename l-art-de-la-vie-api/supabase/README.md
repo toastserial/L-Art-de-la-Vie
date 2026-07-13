@@ -5,7 +5,7 @@ Supabase usa PostgreSQL (no MySQL). Las migraciones están en la carpeta `migrat
 ## Instalación
 
 1. Crea un proyecto en Supabase.
-2. Abre **SQL Editor**, pega cada migración y ejecútala una sola vez, en orden: `202607120001`, `202607120002`, `202607120003` y `202607120004`.
+2. Abre **SQL Editor**, pega cada migración y ejecútala una sola vez, en orden: `202607120001`, `202607120002`, `202607120003`, `202607120004` y `202607120005`.
 3. La migración crea la tienda con ID `00000000-0000-0000-0000-000000000001` y carga el catálogo inicial del frontend.
 4. Cuando exista el primer usuario en Supabase Auth, asígnalo como propietario reemplazando el UUID:
 

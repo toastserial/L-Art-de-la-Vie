@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { api } from "@/lib/api";
-import { Product, Sale, InventoryMovement, CartItem, CashClose, Expense, PaymentMethod } from "@/types";
+import { Product, Sale, InventoryMovement, CartItem, CashClose, CashOpening, Expense, PaymentMethod } from "@/types";
 
 interface StoreData {
   products: Product[];
@@ -8,6 +8,7 @@ interface StoreData {
   movements: InventoryMovement[];
   cashCloses: CashClose[];
   todayExpenses: Expense[];
+  cashOpening: CashOpening | null;
 }
 
 interface StoreContextType extends StoreData {
@@ -27,9 +28,10 @@ interface StoreContextType extends StoreData {
   closeCash: (actualCash: number) => Promise<void>;
   addExpense: (expense: Omit<Expense, "id" | "date">) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  openCash: (openingCash: number, note?: string) => Promise<void>;
 }
 
-const emptyStore: StoreData = { products: [], sales: [], movements: [], cashCloses: [], todayExpenses: [] };
+const emptyStore: StoreData = { products: [], sales: [], movements: [], cashCloses: [], todayExpenses: [], cashOpening: null };
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider = ({ children }: { children: ReactNode }) => {
@@ -112,7 +114,12 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     await refresh();
   };
 
-  return <StoreContext.Provider value={{ ...store, cart, loading, error, refresh, addProduct, updateProduct, deleteProduct, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale, addMovement, closeCash, addExpense, deleteExpense }}>{children}</StoreContext.Provider>;
+  const openCash = async (openingCash: number, note?: string) => {
+    const created = await api<CashOpening>("/cash-openings", { method: "POST", body: JSON.stringify({ openingCash, note }) });
+    setStore((current) => ({ ...current, cashOpening: created }));
+  };
+
+  return <StoreContext.Provider value={{ ...store, cart, loading, error, refresh, addProduct, updateProduct, deleteProduct, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale, addMovement, closeCash, addExpense, deleteExpense, openCash }}>{children}</StoreContext.Provider>;
 };
 
 export const useStore = () => {
