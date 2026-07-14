@@ -1,0 +1,107 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Button, Card, EmptyState, Field, Pill, Segmented, Sheet } from "../components/ui";
+import { Page } from "../components/Page";
+import { useAuth } from "../context/AuthContext";
+import { useStore } from "../context/StoreContext";
+import { colors, money, shortDate } from "../theme";
+import type { Category, Product } from "../types";
+
+const categoryOptions: { value: Category; label: string }[] = ["Decoración", "Perfumes", "Carteras", "Varios"].map(value => ({ value: value as Category, label: value }));
+const blank = { name: "", category: "Decoración" as Category, price: "", stock: "", minStock: "3" };
+
+export function InventoryScreen() {
+  const { canManage } = useAuth();
+  const { products, movements, refreshing, refresh, addProduct, updateProduct, deleteProduct, addMovement } = useStore();
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"products" | "movements">("products");
+  const [productOpen, setProductOpen] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [form, setForm] = useState(blank);
+  const [movementOpen, setMovementOpen] = useState(false);
+  const [movementProduct, setMovementProduct] = useState<Product | null>(null);
+  const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
+  const [quantity, setQuantity] = useState("1");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const filtered = useMemo(() => products.filter(product => `${product.name} ${product.code} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
+  const openNew = () => { setEditing(null); setForm(blank); setProductOpen(true); };
+  const openEdit = (product: Product) => { setEditing(product); setForm({ name: product.name, category: product.category, price: String(product.price), stock: String(product.stock), minStock: String(product.minStock) }); setProductOpen(true); };
+
+  const saveProduct = async () => {
+    const price = Number(form.price), stock = Number(form.stock), minStock = Number(form.minStock);
+    if (!form.name.trim()) return Alert.alert("Falta el nombre", "Escribe el nombre del producto.");
+    if (price < 0 || !Number.isFinite(price) || !Number.isInteger(stock) || stock < 0 || !Number.isInteger(minStock) || minStock < 0) return Alert.alert("Datos inválidos", "Revisa precio y cantidades.");
+    setBusy(true);
+    try {
+      const values = { name: form.name.trim(), category: form.category, price, stock, minStock };
+      if (editing) await updateProduct({ ...editing, ...values }); else await addProduct(values);
+      setProductOpen(false);
+    } catch (reason) { Alert.alert("No se guardó", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
+    finally { setBusy(false); }
+  };
+
+  const openMovement = (product: Product) => { setMovementProduct(product); setMovementType("entrada"); setQuantity("1"); setNote(""); setMovementOpen(true); };
+  const saveMovement = async () => {
+    const amount = Number(quantity);
+    if (!movementProduct || !Number.isInteger(amount) || amount <= 0) return Alert.alert("Cantidad inválida", "Escribe una cantidad entera mayor que cero.");
+    setBusy(true);
+    try { await addMovement(movementProduct.id, movementType, amount, note.trim() || undefined); setMovementOpen(false); }
+    catch (reason) { Alert.alert("No se registró", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
+    finally { setBusy(false); }
+  };
+
+  return <>
+    <Page title="Inventario" subtitle={`${products.length} productos registrados`} refreshing={refreshing} onRefresh={() => refresh(true)}
+      action={canManage ? <Pressable onPress={openNew} style={styles.addButton}><MaterialCommunityIcons name="plus" size={26} color={colors.white} /></Pressable> : undefined}>
+      <Segmented<"products" | "movements"> values={[{ value: "products", label: "Productos" }, { value: "movements", label: "Movimientos" }]} value={tab} onChange={setTab} />
+      {tab === "products" ? <>
+        <View style={styles.search}><Field value={search} onChangeText={setSearch} placeholder="Buscar producto..." /></View>
+        <Card style={styles.list}>
+          {filtered.length === 0 ? <EmptyState icon="package-variant" title="Sin productos" message="No encontramos productos con esa búsqueda." /> : filtered.map((product, index) => {
+            const low = product.stock <= product.minStock;
+            return <Pressable key={product.id} onPress={() => canManage && openEdit(product)} style={[styles.row, index > 0 && styles.border]}>
+              <View style={styles.initial}><Text style={styles.initialText}>{product.name.charAt(0)}</Text></View>
+              <View style={styles.details}><Text style={styles.name}>{product.name}</Text><Text style={styles.meta}>{product.code} · {product.category}</Text><Text style={styles.price}>{money(product.price)}</Text></View>
+              <View style={styles.rowRight}><Pill tone={low ? "danger" : "success"}>{product.stock} uds.</Pill>{canManage && <Pressable onPress={() => openMovement(product)} hitSlop={10} style={styles.moveButton}><MaterialCommunityIcons name="swap-vertical" size={20} color={colors.forest} /></Pressable>}</View>
+            </Pressable>;
+          })}
+        </Card>
+      </> : <Card style={[styles.list, styles.movements]}>
+        {movements.length === 0 ? <EmptyState icon="swap-vertical" title="Sin movimientos" message="Las entradas, salidas y ventas aparecerán aquí." /> : movements.slice(0, 50).map((movement, index) =>
+          <View key={movement.id} style={[styles.row, index > 0 && styles.border]}>
+            <View style={[styles.initial, movement.type === "salida" || movement.type === "venta" ? styles.outIcon : undefined]}><MaterialCommunityIcons name={movement.type === "entrada" ? "arrow-down" : "arrow-up"} size={20} color={movement.type === "entrada" ? colors.success : colors.danger} /></View>
+            <View style={styles.details}><Text style={styles.name}>{movement.productName}</Text><Text style={styles.meta}>{shortDate(movement.date)}{movement.note ? ` · ${movement.note}` : ""}</Text></View>
+            <View style={styles.movementRight}><Text style={[styles.movementQty, { color: movement.type === "entrada" ? colors.success : colors.danger }]}>{movement.type === "entrada" ? "+" : "-"}{movement.quantity}</Text><Text style={styles.movementType}>{movement.type}</Text></View>
+          </View>)}
+      </Card>}
+    </Page>
+
+    <Sheet visible={productOpen} onClose={() => setProductOpen(false)} title={editing ? "Editar producto" : "Nuevo producto"} footer={<View style={styles.footerRow}>{editing && <Button title="Eliminar" variant="danger" icon="trash-can-outline" onPress={() => Alert.alert("Eliminar producto", `¿Desactivar ${editing.name}?`, [{ text: "Cancelar" }, { text: "Eliminar", style: "destructive", onPress: async () => { try { await deleteProduct(editing.id); setProductOpen(false); } catch (reason) { Alert.alert("No se eliminó", reason instanceof Error ? reason.message : "Intenta nuevamente"); } } }])} style={styles.footerDelete} />}<Button title="Guardar" icon="content-save-outline" onPress={saveProduct} loading={busy} style={styles.footerSave} /></View>}>
+      <Field label="Nombre" value={form.name} onChangeText={name => setForm(current => ({ ...current, name }))} placeholder="Nombre del producto" />
+      <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
+      <View style={styles.fieldSpacer} />
+      <Field label="Precio" value={form.price} onChangeText={price => setForm(current => ({ ...current, price }))} keyboardType="decimal-pad" placeholder="0.00" />
+      <View style={styles.twoFields}><View style={styles.half}><Field label="Existencias" value={form.stock} onChangeText={stock => setForm(current => ({ ...current, stock }))} keyboardType="number-pad" placeholder="0" /></View><View style={styles.half}><Field label="Stock mínimo" value={form.minStock} onChangeText={minStock => setForm(current => ({ ...current, minStock }))} keyboardType="number-pad" placeholder="3" /></View></View>
+    </Sheet>
+
+    <Sheet visible={movementOpen} onClose={() => setMovementOpen(false)} title="Ajustar inventario" footer={<Button title="Registrar movimiento" icon="check" onPress={saveMovement} loading={busy} />}>
+      <View style={styles.selectedProduct}><Text style={styles.selectedName}>{movementProduct?.name}</Text><Text style={styles.selectedStock}>Stock actual: {movementProduct?.stock}</Text></View>
+      <Text style={styles.label}>Tipo de movimiento</Text><Segmented<"entrada" | "salida"> values={[{ value: "entrada", label: "Entrada (+)" }, { value: "salida", label: "Salida (-)" }]} value={movementType} onChange={setMovementType} />
+      <View style={styles.fieldSpacer} /><Field label="Cantidad" value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />
+      <Field label="Motivo o nota" value={note} onChangeText={setNote} placeholder="Ej. compra a proveedor" multiline />
+    </Sheet>
+  </>;
+}
+
+const styles = StyleSheet.create({
+  addButton: { width: 47, height: 47, borderRadius: 16, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" }, search: { marginTop: 16 }, list: { padding: 4 }, movements: { marginTop: 16 },
+  row: { minHeight: 84, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 10 }, border: { borderTopWidth: 1, borderTopColor: colors.line },
+  initial: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, outIcon: { backgroundColor: colors.dangerSoft }, initialText: { color: colors.forest, fontSize: 18, fontWeight: "900" },
+  details: { flex: 1, marginHorizontal: 11 }, name: { color: colors.ink, fontSize: 13, fontWeight: "800" }, meta: { color: colors.muted, fontSize: 10, marginTop: 3 }, price: { color: colors.forest, fontSize: 12, fontWeight: "900", marginTop: 5 }, rowRight: { alignItems: "flex-end", gap: 7 }, moveButton: { width: 34, height: 30, borderRadius: 9, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" },
+  movementRight: { alignItems: "flex-end" }, movementQty: { fontSize: 17, fontWeight: "900" }, movementType: { color: colors.muted, fontSize: 10, textTransform: "capitalize", marginTop: 2 },
+  footerRow: { flexDirection: "row", gap: 10 }, footerDelete: { flex: 0.8 }, footerSave: { flex: 1.2 }, label: { fontSize: 13, color: colors.ink, fontWeight: "700", marginBottom: 9 }, fieldSpacer: { height: 18 }, twoFields: { flexDirection: "row", gap: 12 }, half: { flex: 1 },
+  selectedProduct: { backgroundColor: colors.forestSoft, padding: 15, borderRadius: 16, marginBottom: 18 }, selectedName: { color: colors.forest, fontWeight: "900" }, selectedStock: { color: colors.muted, fontSize: 12, marginTop: 4 },
+});
