@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { StoreProvider, useStore } from "./src/context/StoreContext";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { colors } from "./src/theme";
+import { BrandLogo } from "./src/components/BrandLogo";
 
 export default function App() {
   return <AuthProvider><StatusBar style="dark" /><AuthGate /></AuthProvider>;
@@ -28,10 +29,10 @@ function StoreGate() {
 }
 
 function Loading({ message }: { message: string }) {
-  return <View style={styles.loading}><View style={styles.loadingLogo}><MaterialCommunityIcons name="flower-tulip-outline" size={37} color={colors.gold} /></View><ActivityIndicator size="large" color={colors.forest} /><Text style={styles.loadingText}>{message}</Text></View>;
+  return <View style={styles.loading}><BrandLogo size={156} /><ActivityIndicator size="large" color={colors.forest} /><Text style={styles.loadingText}>{message}</Text></View>;
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: colors.cream, alignItems: "center", justifyContent: "center", gap: 16 }, loadingLogo: { width: 72, height: 72, borderRadius: 24, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center", marginBottom: 5 }, loadingText: { color: colors.muted, fontSize: 13 },
+  loading: { flex: 1, backgroundColor: colors.cream, alignItems: "center", justifyContent: "center", gap: 18 }, loadingText: { color: colors.muted, fontSize: 13 },
   errorPage: { flex: 1, backgroundColor: colors.cream, justifyContent: "center", padding: 28 }, errorIcon: { width: 70, height: 70, borderRadius: 24, backgroundColor: colors.dangerSoft, alignItems: "center", justifyContent: "center", alignSelf: "center" }, errorTitle: { textAlign: "center", fontSize: 24, fontWeight: "900", color: colors.ink, marginTop: 18 }, errorMessage: { textAlign: "center", color: colors.muted, lineHeight: 20, marginTop: 7, marginBottom: 22 },
 });

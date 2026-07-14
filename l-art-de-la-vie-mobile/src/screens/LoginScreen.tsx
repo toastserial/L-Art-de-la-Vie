@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { Button, Field } from "../components/ui";
+import { BrandLogo } from "../components/BrandLogo";
 import { useAuth } from "../context/AuthContext";
 import { supabaseConfigError } from "../lib/supabase";
 import { colors, shadow } from "../theme";
@@ -32,8 +33,7 @@ export function LoginScreen() {
   return <LinearGradient colors={["#052D18", colors.forest, "#0F5732"]} style={styles.background}>
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.center}>
       <View style={styles.brand}>
-        <View style={styles.logo}><MaterialCommunityIcons name="flower-tulip-outline" size={42} color={colors.gold} /></View>
-        <Text style={styles.brandName}>L'Art de la Vie</Text>
+        <BrandLogo size={148} />
         <Text style={styles.brandSub}>Punto de venta móvil</Text>
       </View>
       <View style={styles.panel}>
@@ -54,9 +54,7 @@ const styles = StyleSheet.create({
   background: { flex: 1 },
   center: { flex: 1, justifyContent: "center", padding: 22 },
   brand: { alignItems: "center", marginBottom: 25 },
-  logo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
-  brandName: { color: colors.white, fontSize: 30, fontWeight: "900", marginTop: 12, letterSpacing: -0.6 },
-  brandSub: { color: "rgba(255,255,255,0.7)", marginTop: 3 },
+  brandSub: { color: "rgba(255,255,255,0.76)", marginTop: 12, fontWeight: "700", letterSpacing: 0.4 },
   panel: { backgroundColor: colors.cream, borderRadius: 28, padding: 22, ...shadow },
   title: { fontSize: 25, fontWeight: "900", color: colors.ink },
   copy: { color: colors.muted, lineHeight: 20, marginTop: 5, marginBottom: 20 },
