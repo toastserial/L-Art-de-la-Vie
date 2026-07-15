@@ -1,6 +1,12 @@
 import { storeId, supabase } from "./supabase.js";
 import { httpError } from "./validation.js";
 
+const displayName = (storedName, email) => {
+  const cleanName = typeof storedName === "string" ? storedName.trim() : "";
+  const username = typeof email === "string" ? email.split("@")[0].trim() : "";
+  return cleanName && !cleanName.includes("@") ? cleanName : username || "Usuario";
+};
+
 export async function requireAuth(req, _res, next) {
   try {
     const [scheme, token] = (req.get("authorization") ?? "").split(" ");
@@ -19,13 +25,10 @@ export async function requireAuth(req, _res, next) {
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
 
     const storedName = profile?.full_name || user.user_metadata?.full_name;
-    const safeName = storedName && storedName.toLowerCase() !== user.email?.toLowerCase()
-      ? storedName
-      : "Usuario";
 
     req.auth = {
       userId: user.id,
-      fullName: safeName,
+      fullName: displayName(storedName, user.email),
       role: membership.role
     };
     next();

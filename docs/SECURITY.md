@@ -37,7 +37,7 @@ La clave `SUPABASE_SERVICE_ROLE_KEY` vive exclusivamente en Render. La web y la 
 - Las ventas rechazan carritos vacíos, duplicados o excesivamente grandes.
 - Las imágenes se verifican por su contenido binario real, no solamente por su extensión o MIME declarado.
 - Los errores internos de PostgreSQL no se entregan al navegador. El usuario recibe un mensaje genérico y un `requestId` para buscar el incidente en Render.
-- Render recibe un log estructurado por cada llamada real a la API con ruta, estado, duración, UUID y rol. Nunca se registran tokens, correos, contraseñas, cuerpos ni query strings.
+- Render recibe un log estructurado por cada llamada real a la API con ruta, estado, duración, UUID, nombre visible y rol. Nunca se registran tokens, correos completos, contraseñas, cuerpos ni query strings.
 - Helmet y Vercel agregan cabeceras contra clickjacking, MIME sniffing y carga de recursos no autorizados.
 - En la web, la sesión se guarda en `sessionStorage`; se elimina al cerrar el navegador, adecuado para una caja compartida.
 - La migración `202607140002_backend_only_access.sql` revoca a `anon` y `authenticated` el acceso directo a tablas y RPC comerciales. Todo pasa por Express.

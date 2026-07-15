@@ -29,6 +29,7 @@ export function AppShell() {
   const [accountOpen, setAccountOpen] = useState(false);
   const Screen = tab === "home" ? DashboardScreen : tab === "pos" ? POSScreen : tab === "inventory" ? InventoryScreen : CashScreen;
   const role = user?.role === "owner" ? "Propietario" : user?.role === "admin" ? "Administrador" : "Cajero";
+  const username = user?.email.split("@")[0] || "usuario";
   const compact = width < 350;
 
   return <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -64,7 +65,7 @@ export function AppShell() {
       <View style={styles.profile}>
         <View style={styles.profileAvatar}><Text style={styles.profileInitial}>{user?.fullName?.charAt(0).toUpperCase()}</Text></View>
         <Text style={styles.profileName}>{user?.fullName}</Text>
-        <Text style={styles.profileEmail}>{user?.email}</Text>
+        <Text style={styles.profileEmail}>@{username}</Text>
         <View style={styles.role}><Text style={styles.roleText}>{role}</Text></View>
       </View>
       {cartCount > 0 && <View style={styles.pending}>

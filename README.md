@@ -25,6 +25,7 @@ En Supabase → **SQL Editor**, ejecuta en orden los archivos de `l-art-de-la-vi
 5. `202607120005_cash_openings.sql`
 6. `202607140001_product_images.sql`
 7. `202607140002_backend_only_access.sql`
+8. `202607140003_user_display_names.sql`
 
 ### 2. Primer usuario
 

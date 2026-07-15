@@ -113,6 +113,7 @@ export function createApp() {
         status: res.statusCode,
         durationMs: Math.round(durationMs * 100) / 100,
         userId: req.auth?.userId ?? null,
+        userName: req.auth?.fullName ?? null,
         role: req.auth?.role ?? null
       });
       if (res.statusCode >= 500) console.error(entry);

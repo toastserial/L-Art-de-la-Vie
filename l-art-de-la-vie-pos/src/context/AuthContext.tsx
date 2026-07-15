@@ -20,9 +20,15 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 type SessionProfile = Pick<AppUser, "fullName" | "role">;
 
+const displayName = (name: string, email: string) => {
+  const cleanName = name.trim();
+  return cleanName && !cleanName.includes("@") ? cleanName : email.split("@")[0] || "Usuario";
+};
+
 const loadUser = async (session: Session): Promise<AppUser> => {
   const profile = await api<SessionProfile>("/auth/me");
-  return { id: session.user.id, email: session.user.email ?? "", ...profile };
+  const email = session.user.email ?? "";
+  return { id: session.user.id, email, ...profile, fullName: displayName(profile.fullName, email) };
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
