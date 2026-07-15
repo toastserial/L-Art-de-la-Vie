@@ -9,9 +9,10 @@ import { StoreProvider, useStore } from "./src/context/StoreContext";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { colors } from "./src/theme";
 import { BrandLogo } from "./src/components/BrandLogo";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function App() {
-  return <AuthProvider><StatusBar style="dark" /><AuthGate /></AuthProvider>;
+  return <SafeAreaProvider><AuthProvider><StatusBar style="dark" backgroundColor={colors.white} /><AuthGate /></AuthProvider></SafeAreaProvider>;
 }
 
 function AuthGate() {

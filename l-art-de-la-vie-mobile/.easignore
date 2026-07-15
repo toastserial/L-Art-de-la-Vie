@@ -1,0 +1,29 @@
+# Dependencias y archivos generados localmente
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Variables locales: EAS usa las variables del entorno "preview"
+.env
+.env.*
+!.env.example
+
+# Carpetas nativas generadas por Expo
+android/
+ios/
+
+# Archivos del sistema y registros
+.DS_Store
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Credenciales locales
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision

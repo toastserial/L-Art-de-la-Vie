@@ -11,13 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Search, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, ImagePlus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { uploadProductImage } from "@/lib/api";
 
 const categories: Category[] = ["Decoración", "Perfumes", "Carteras", "Varios"];
 
-const emptyProduct = { name: "", category: "Decoración" as Category, price: 0, stock: 0, minStock: 3 };
+type ProductForm = Omit<Product, "id" | "code">;
+const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, stock: 0, minStock: 3 };
 
 export default function Inventory() {
   const { products, movements, addProduct, updateProduct, deleteProduct, addMovement } = useStore();
@@ -28,6 +30,9 @@ export default function Inventory() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyProduct);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
   const [movementDialog, setMovementDialog] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -40,23 +45,34 @@ export default function Inventory() {
     return matchSearch && matchCat;
   });
 
-  const openAdd = () => { setEditingProduct(null); setForm(emptyProduct); setDialogOpen(true); };
-  const openEdit = (p: Product) => { setEditingProduct(p); setForm({ name: p.name, category: p.category, price: p.price, stock: p.stock, minStock: p.minStock }); setDialogOpen(true); };
+  const openAdd = () => { setEditingProduct(null); setImageFile(null); setImagePreview(undefined); setForm(emptyProduct); setDialogOpen(true); };
+  const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, stock: p.stock, minStock: p.minStock, image: p.image }); setDialogOpen(true); };
+
+  const handleImage = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast({ title: "Archivo inválido", description: "Selecciona una fotografía.", variant: "destructive" });
+    if (file.size > 6 * 1024 * 1024) return toast({ title: "Fotografía demasiado grande", description: "El tamaño máximo es 6 MB.", variant: "destructive" });
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   const handleSave = async () => {
     if (!form.name) { toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" }); return; }
+    setSaving(true);
     try {
+      const image = imageFile ? (await uploadProductImage(imageFile)).url : form.image;
+      const values = { ...form, image };
       if (editingProduct) {
-        await updateProduct({ ...editingProduct, ...form });
+        await updateProduct({ ...editingProduct, ...values });
         toast({ title: "Producto actualizado" });
       } else {
-        await addProduct(form);
+        await addProduct(values);
         toast({ title: "Producto agregado" });
       }
       setDialogOpen(false);
     } catch (error) {
       toast({ title: "No se pudo guardar", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
-    }
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -126,7 +142,12 @@ export default function Inventory() {
                   {filtered.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {p.image ? <img src={p.image} alt={p.name} className="h-11 w-11 rounded-xl object-cover border" /> : <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center font-bold text-primary">{p.name.charAt(0)}</div>}
+                          <span className="font-medium">{p.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell><Badge variant="secondary">{p.category}</Badge></TableCell>
                       <TableCell className="text-right">L {p.price.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
@@ -207,11 +228,25 @@ export default function Inventory() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Editar Producto" : "Agregar Producto"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border bg-muted/30 p-4">
+              <div className="relative h-32 w-full sm:w-32 shrink-0 overflow-hidden rounded-2xl border bg-background">
+                {imagePreview ? <img src={imagePreview} alt="Vista previa del producto" className="h-full w-full object-cover" /> : <div className="flex h-full flex-col items-center justify-center text-muted-foreground"><ImagePlus className="h-7 w-7" /><span className="mt-2 text-xs">Sin fotografía</span></div>}
+              </div>
+              <div className="flex flex-1 flex-col justify-center">
+                <Label className="font-semibold">Fotografía del producto</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Selecciona una imagen cuadrada de hasta 6 MB. En teléfono podrás usar la cámara.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" asChild><label htmlFor="product-image" className="cursor-pointer"><ImagePlus className="mr-2 h-4 w-4" />Seleccionar foto</label></Button>
+                  {imagePreview && <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => { setImageFile(null); setImagePreview(undefined); setForm(current => ({ ...current, image: undefined })); }}><X className="mr-1 h-4 w-4" />Quitar</Button>}
+                  <input id="product-image" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={(event) => { handleImage(event.target.files?.[0]); event.target.value = ""; }} />
+                </div>
+              </div>
+            </div>
             <div>
                 <Label>Categoría</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as Category })}>
@@ -229,7 +264,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave}>{editingProduct ? "Guardar" : "Agregar"}</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? "Guardando..." : editingProduct ? "Guardar" : "Agregar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

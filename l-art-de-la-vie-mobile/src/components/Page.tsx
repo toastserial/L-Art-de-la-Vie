@@ -25,7 +25,7 @@ export function Page({ title, subtitle, action, children, refreshing, onRefresh 
 
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: colors.cream },
-  content: { padding: 18, paddingBottom: 115 },
+  content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 30 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   headerText: { flex: 1, paddingRight: 12 },
   title: { color: colors.ink, fontSize: 28, fontWeight: "900", letterSpacing: -0.6 },

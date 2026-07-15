@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Card, EmptyState, Field, Pill, Segmented, Sheet } from "../components/ui";
 import { Page } from "../components/Page";
 import { useStore } from "../context/StoreContext";
@@ -89,7 +89,10 @@ export function POSScreen() {
 function ProductCard({ product, onAdd }: { product: Product; onAdd(): void }) {
   const low = product.stock <= product.minStock;
   return <Pressable onPress={onAdd} style={({ pressed }) => [styles.product, pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }]}>
-    <View style={styles.productTop}><View style={styles.productIcon}><Text style={styles.productInitial}>{product.name.charAt(0)}</Text></View><Pill tone={low ? "danger" : "success"}>{product.stock}</Pill></View>
+    <View style={styles.productVisual}>
+      {product.image ? <Image source={{ uri: product.image }} style={styles.productImage} /> : <View style={styles.productPlaceholder}><MaterialCommunityIcons name="package-variant-closed" size={30} color={colors.forest} /></View>}
+      <View style={styles.stockPill}><Pill tone={low ? "danger" : "success"}>{product.stock}</Pill></View>
+    </View>
     <Text style={styles.productName} numberOfLines={2}>{product.name}</Text><Text style={styles.productCode}>{product.code}</Text>
     <View style={styles.productBottom}><Text style={styles.productPrice}>{money(product.price)}</Text><View style={styles.add}><MaterialCommunityIcons name="plus" size={19} color={colors.white} /></View></View>
   </Pressable>;
@@ -102,9 +105,9 @@ function Summary({ label, value, total, danger }: { label: string; value: string
 const styles = StyleSheet.create({
   cartButton: { width: 47, height: 47, borderRadius: 16, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" }, cartBadge: { position: "absolute", right: -4, top: -5, backgroundColor: colors.gold, minWidth: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 }, cartBadgeText: { color: colors.white, fontSize: 10, fontWeight: "900" },
   closed: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.goldSoft, borderRadius: 14, padding: 12, marginBottom: 14 }, closedText: { color: colors.warning, fontSize: 12, fontWeight: "700" },
-  productGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 17 }, product: { width: "48%", backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 13, minHeight: 190 },
-  productTop: { flexDirection: "row", justifyContent: "space-between" }, productIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, productInitial: { fontWeight: "900", color: colors.forest, fontSize: 17 },
-  productName: { color: colors.ink, fontWeight: "800", fontSize: 14, minHeight: 37, marginTop: 12 }, productCode: { color: colors.muted, fontSize: 10, marginTop: 2 }, productBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }, productPrice: { color: colors.forest, fontWeight: "900", fontSize: 15 }, add: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
+  productGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 17 }, product: { width: "48%", flexGrow: 1, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 10, minHeight: 232, overflow: "hidden" },
+  productVisual: { height: 104, borderRadius: 15, overflow: "hidden", backgroundColor: colors.forestSoft }, productImage: { width: "100%", height: "100%" }, productPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" }, stockPill: { position: "absolute", top: 7, right: 7 },
+  productName: { color: colors.ink, fontWeight: "800", fontSize: 14, minHeight: 37, marginTop: 10 }, productCode: { color: colors.muted, fontSize: 10, marginTop: 2 }, productBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }, productPrice: { color: colors.forest, fontWeight: "900", fontSize: 15 }, add: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
   emptyCard: { marginTop: 18 }, viewCart: { marginTop: 18 },
   cartRow: { minHeight: 75, flexDirection: "row", alignItems: "center", gap: 10 }, cartBorder: { borderTopWidth: 1, borderTopColor: colors.line }, cartProduct: { flex: 1 }, cartName: { color: colors.ink, fontWeight: "800", fontSize: 13 }, cartPrice: { color: colors.muted, fontSize: 11, marginTop: 3 },
   quantity: { flexDirection: "row", alignItems: "center", gap: 7 }, qtyButton: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, qtyText: { minWidth: 20, textAlign: "center", color: colors.ink, fontWeight: "900" },

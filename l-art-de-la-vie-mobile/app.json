@@ -4,7 +4,7 @@
     "slug": "l-art-de-la-vie-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/lartdela.png",
     "userInterfaceStyle": "light",
     "scheme": "lartdelavie",
     "ios": {
@@ -14,10 +14,8 @@
     "android": {
       "package": "com.lartdelavie.pos",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#00451F",
+        "foregroundImage": "./assets/lartdela.png"
       }
     },
     "web": {
@@ -25,7 +23,21 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-font"
-    ]
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'Art de la Vie necesita acceso a tus fotos para agregar imágenes a los productos.",
+          "cameraPermission": "L'Art de la Vie necesita usar la cámara para fotografiar productos.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d9be79cd-c2db-4110-a630-0f1db8427740"
+      }
+    },
+    "owner": "cerialqiller321"
   }
 }

@@ -60,12 +60,16 @@ export default function POS() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {filteredProducts.map((p) => (
               <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => addToCart(p)}>
-                <CardContent className="p-4">
+                <CardContent className="p-3">
+                  <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl bg-secondary">
+                    {p.image ? <img src={p.image} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 hover:scale-105" /> : <div className="flex h-full items-center justify-center text-3xl font-display font-bold text-primary/50">{p.name.charAt(0)}</div>}
+                    <Badge variant={p.stock <= p.minStock ? "destructive" : "secondary"} className="absolute right-2 top-2 text-xs shadow-sm">{p.stock}</Badge>
+                  </div>
                   <p className="font-medium text-sm truncate">{p.name}</p>
                   <p className="text-xs text-muted-foreground">{p.code}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-bold text-primary">L {p.price.toFixed(2)}</span>
-                    <Badge variant={p.stock <= p.minStock ? "destructive" : "secondary"} className="text-xs">{p.stock}</Badge>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Plus className="h-4 w-4" /></span>
                   </div>
                 </CardContent>
               </Card>
