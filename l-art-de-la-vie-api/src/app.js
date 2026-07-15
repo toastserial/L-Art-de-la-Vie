@@ -95,6 +95,32 @@ export function createApp() {
     res.set("X-Request-Id", req.requestId);
     next();
   });
+  app.use((req, res, next) => {
+    const shouldLog = (req.path === "/api" || req.path.startsWith("/api/"))
+      && req.path !== "/api/health"
+      && req.method !== "OPTIONS";
+    if (!shouldLog) return next();
+
+    const startedAt = process.hrtime.bigint();
+    res.once("finish", () => {
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const entry = JSON.stringify({
+        level: res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warning" : "info",
+        event: "api_request",
+        requestId: req.requestId,
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Math.round(durationMs * 100) / 100,
+        userId: req.auth?.userId ?? null,
+        role: req.auth?.role ?? null
+      });
+      if (res.statusCode >= 500) console.error(entry);
+      else if (res.statusCode >= 400) console.warn(entry);
+      else console.info(entry);
+    });
+    next();
+  });
   app.use(cors({
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
@@ -278,10 +304,12 @@ export function createApp() {
     const malformedJson = error?.type === "entity.parse.failed";
     const status = malformedJson ? 400 : Number.isInteger(error?.status) ? error.status : 500;
     const message = malformedJson ? "El contenido JSON no es válido" : error?.expose ? error.message : "Error interno del servidor";
-    console.error(JSON.stringify({
-      level: "error", requestId: req.requestId, method: req.method, path: req.path,
-      status, code: error?.code ?? "INTERNAL_ERROR", error: error?.message ?? "Unknown error"
-    }));
+    if (status >= 500) {
+      console.error(JSON.stringify({
+        level: "error", event: "api_error", requestId: req.requestId, method: req.method, path: req.path,
+        status, code: error?.code ?? "INTERNAL_ERROR", error: error?.message ?? "Unknown error"
+      }));
+    }
     res.status(status).json({ message, requestId: req.requestId });
   });
   return app;
