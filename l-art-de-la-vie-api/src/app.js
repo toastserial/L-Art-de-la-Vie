@@ -2,6 +2,8 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import multer from "multer";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
@@ -13,6 +15,14 @@ import { requireAuth, requireRole } from "./auth.js";
 const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
 const openApiDocument = YAML.parse(readFileSync(new URL("../docs/openapi.yaml", import.meta.url), "utf8"));
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024, files: 1 },
+  fileFilter(_req, file, callback) {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    callback(allowed.includes(file.mimetype) ? null : httpError(400, "Formato de imagen no permitido"), allowed.includes(file.mimetype));
+  }
+});
 
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const firstRow = (value) => Array.isArray(value) ? value[0] : value;
@@ -120,6 +130,20 @@ export function createApp() {
     res.status(201).json(productFromDb(unwrap(await supabase.from("products").insert(values).select().single())));
   }));
 
+  app.post("/api/product-images", requireRole("owner", "admin"), imageUpload.single("image"), asyncRoute(async (req, res) => {
+    if (!req.file) throw httpError(400, "Selecciona una fotografía");
+    const extensionByType = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+      "image/heic": "heic", "image/heif": "heif"
+    };
+    const objectPath = `${storeId}/${randomUUID()}.${extensionByType[req.file.mimetype] ?? "jpg"}`;
+    unwrap(await supabase.storage.from("product-images").upload(objectPath, req.file.buffer, {
+      contentType: req.file.mimetype, cacheControl: "31536000", upsert: false
+    }));
+    const { data } = supabase.storage.from("product-images").getPublicUrl(objectPath);
+    res.status(201).json({ url: data.publicUrl });
+  }));
+
   app.put("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     if (!categories.includes(req.body.category)) throw httpError(400, "Categoría inválida");
     const values = {
@@ -190,6 +214,10 @@ export function createApp() {
   app.use((_req, res) => res.status(404).json({ message: "Ruta no encontrada" }));
   app.use((error, _req, res, _next) => {
     console.error(error);
+    if (error instanceof multer.MulterError) {
+      const message = error.code === "LIMIT_FILE_SIZE" ? "La fotografía no puede superar 6 MB" : "No se pudo procesar la fotografía";
+      return res.status(400).json({ message });
+    }
     res.status(error.status ?? 500).json({ message: error.message || "Error interno del servidor" });
   });
   return app;
