@@ -18,6 +18,12 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+type SessionProfile = Pick<AppUser, "fullName" | "role">;
+
+const loadUser = async (session: Session): Promise<AppUser> => {
+  const profile = await api<SessionProfile>("/auth/me");
+  return { id: session.user.id, email: session.user.email ?? "", ...profile };
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       setSession(nextSession);
       if (!nextSession) { setUser(null); setLoading(false); return; }
-      try { setUser(await api<AppUser>("/auth/me")); }
+      try { setUser(await loadUser(nextSession)); }
       catch { await supabase.auth.signOut(); setUser(null); }
       finally { if (active) setLoading(false); }
     };
@@ -46,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) { setLoading(false); throw new Error("Correo o contraseña incorrectos"); }
     setSession(data.session);
-    try { setUser(await api<AppUser>("/auth/me")); }
+    try { setUser(await loadUser(data.session)); }
     catch (error) { await supabase.auth.signOut(); throw error; }
     finally { setLoading(false); }
   };

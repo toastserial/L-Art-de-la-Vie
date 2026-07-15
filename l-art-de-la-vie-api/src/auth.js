@@ -18,10 +18,14 @@ export async function requireAuth(req, _res, next) {
     if (memberError || !membership) throw httpError(403, "Tu usuario no tiene acceso a esta tienda");
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
 
+    const storedName = profile?.full_name || user.user_metadata?.full_name;
+    const safeName = storedName && storedName.toLowerCase() !== user.email?.toLowerCase()
+      ? storedName
+      : "Usuario";
+
     req.auth = {
       userId: user.id,
-      email: user.email,
-      fullName: profile?.full_name || user.user_metadata?.full_name || user.email,
+      fullName: safeName,
       role: membership.role
     };
     next();

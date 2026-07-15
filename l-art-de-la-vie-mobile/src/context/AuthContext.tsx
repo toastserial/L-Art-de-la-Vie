@@ -15,6 +15,12 @@ interface AuthValue {
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
+type SessionProfile = Pick<AppUser, "fullName" | "role">;
+
+const loadUser = async (session: Session): Promise<AppUser> => {
+  const profile = await api<SessionProfile>("/auth/me");
+  return { id: session.user.id, email: session.user.email ?? "", ...profile };
+};
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
@@ -32,7 +38,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
       try {
-        setUser(await api<AppUser>("/auth/me"));
+        setUser(await loadUser(next));
       } catch {
         await supabase.auth.signOut({ scope: "local" });
         setUser(null);
@@ -54,7 +60,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
     setSession(data.session);
     try {
-      setUser(await api<AppUser>("/auth/me"));
+      setUser(await loadUser(data.session));
     } catch (reason) {
       await supabase.auth.signOut({ scope: "local" });
       throw reason;

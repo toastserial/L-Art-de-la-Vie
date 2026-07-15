@@ -6,7 +6,8 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    // El servidor de desarrollo queda accesible solo desde esta computadora.
+    host: "127.0.0.1",
     port: 8080,
     hmr: {
       overlay: false,

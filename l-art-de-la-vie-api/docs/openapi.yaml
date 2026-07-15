@@ -58,13 +58,13 @@ paths:
   /api/auth/me:
     get:
       tags: [Autenticación]
-      summary: Devuelve el usuario autenticado y su rol
+      summary: Devuelve solamente el nombre y rol necesarios para la interfaz
       responses:
         '200':
           description: Usuario actual
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AppUser' }
+              schema: { $ref: '#/components/schemas/SessionProfile' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /api/store:
@@ -321,11 +321,11 @@ components:
       required: [message]
       properties:
         message: { type: string }
-    AppUser:
+        requestId: { type: string, format: uuid }
+    SessionProfile:
       type: object
+      required: [fullName, role]
       properties:
-        id: { type: string, format: uuid }
-        email: { type: string, format: email }
         fullName: { type: string }
         role: { type: string, enum: [owner, admin, cashier] }
     ProductInput:

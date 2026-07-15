@@ -8,5 +8,11 @@ export const supabaseConfigError = !url || !publishableKey
   : null;
 
 export const supabase = createClient(url || "http://127.0.0.1:54321", publishableKey || "configuracion-pendiente", {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    // En una computadora compartida del POS, la sesión termina al cerrar el navegador.
+    storage: window.sessionStorage
+  }
 });

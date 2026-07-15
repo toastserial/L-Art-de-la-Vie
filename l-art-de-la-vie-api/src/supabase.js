@@ -14,8 +14,18 @@ export const supabase = createClient(url, key, {
 
 export function unwrap(result) {
   if (result.error) {
-    const error = new Error(result.error.message);
-    error.status = result.error.code === "23505" ? 409 : result.error.code === "PGRST116" ? 404 : 400;
+    const known = result.error.code === "23505"
+      ? { status: 409, message: "El registro ya existe" }
+      : result.error.code === "PGRST116"
+        ? { status: 404, message: "Registro no encontrado" }
+        : result.error.code === "P0001"
+          ? { status: 409, message: result.error.message }
+          : null;
+    const error = new Error(known?.message ?? "Falló una operación de base de datos");
+    error.status = known?.status ?? 500;
+    error.code = result.error.code ?? "DATABASE_ERROR";
+    error.expose = !!known;
+    error.databaseMessage = result.error.message;
     throw error;
   }
   return result.data;

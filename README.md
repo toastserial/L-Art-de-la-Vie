@@ -10,6 +10,8 @@ Sistema privado de punto de venta con aplicaciones web y móvil, Express y Supab
 
 Documentación detallada de arquitectura, componentes, base de datos, Git y despliegue: [`docs/SYSTEM_GUIDE.md`](docs/SYSTEM_GUIDE.md).
 
+Guía de seguridad, permisos y verificación: [`docs/SECURITY.md`](docs/SECURITY.md).
+
 ## Configuración inicial
 
 ### 1. Base de datos
@@ -21,6 +23,8 @@ En Supabase → **SQL Editor**, ejecuta en orden los archivos de `l-art-de-la-vi
 3. `202607120003_auth_bootstrap.sql`
 4. `202607120004_auto_product_codes.sql`
 5. `202607120005_cash_openings.sql`
+6. `202607140001_product_images.sql`
+7. `202607140002_backend_only_access.sql`
 
 ### 2. Primer usuario
 

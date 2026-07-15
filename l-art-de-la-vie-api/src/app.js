@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { fileTypeFromBuffer } from "file-type";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -9,12 +10,22 @@ import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 import { closeFromDb, expenseFromDb, movementFromDb, openingFromDb, productFromDb, saleFromDb } from "./mappers.js";
 import { storeId, supabase, unwrap } from "./supabase.js";
-import { httpError, number, text } from "./validation.js";
+import { httpError, integer, number, optionalText, text, uuid } from "./validation.js";
 import { requireAuth, requireRole } from "./auth.js";
 
 const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
 const openApiDocument = YAML.parse(readFileSync(new URL("../docs/openapi.yaml", import.meta.url), "utf8"));
+const imageBaseUrl = `${(process.env.SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/product-images/${storeId}/`;
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false,
+  skip: (req) => ["GET", "HEAD", "OPTIONS"].includes(req.method),
+  message: { message: "Demasiadas operaciones. Espera unos minutos e intenta nuevamente." }
+});
+const imageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false,
+  message: { message: "Se alcanzó el límite de fotografías por hora." }
+});
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 6 * 1024 * 1024, files: 1 },
@@ -26,6 +37,34 @@ const imageUpload = multer({
 
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const firstRow = (value) => Array.isArray(value) ? value[0] : value;
+const productImage = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > 600 || !value.startsWith(imageBaseUrl)) {
+    throw httpError(400, "La URL de la fotografía no es válida");
+  }
+  return value;
+};
+const productValues = (body) => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw httpError(400, "Datos de producto inválidos");
+  if (!categories.includes(body.category)) throw httpError(400, "Categoría inválida");
+  return {
+    name: text(body.name, "Nombre", 160), category: body.category,
+    price: number(body.price, "Precio", 0, 100_000_000), stock: integer(body.stock, "Stock"),
+    min_stock: integer(body.minStock, "Stock mínimo"), image_url: productImage(body.image)
+  };
+};
+const saleItems = (value) => {
+  if (!Array.isArray(value) || value.length === 0) throw httpError(400, "El carrito está vacío");
+  if (value.length > 100) throw httpError(400, "Una venta no puede superar 100 productos diferentes");
+  const seen = new Set();
+  return value.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw httpError(400, "Producto de venta inválido");
+    const productId = uuid(item.productId, "Producto");
+    if (seen.has(productId)) throw httpError(400, "El carrito contiene productos duplicados");
+    seen.add(productId);
+    return { productId, quantity: integer(item.quantity, "Cantidad", 1, 10_000) };
+  });
+};
 const dateInTimezone = (value, timezone) => {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit"
@@ -48,15 +87,43 @@ export function createApp() {
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""));
   app.set("trust proxy", 1);
+  app.disable("x-powered-by");
+  app.disable("etag");
   app.use(helmet());
+  app.use((req, res, next) => {
+    req.requestId = randomUUID();
+    res.set("X-Request-Id", req.requestId);
+    next();
+  });
   app.use(cors({
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) return callback(null, true);
       return callback(httpError(403, "Origen no permitido por CORS"));
-    }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+    maxAge: 86400
   }));
   app.use(express.json({ limit: "100kb" }));
-  app.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false }));
+  app.use("/api", (req, _res, next) => {
+    const needsJson = ["POST", "PUT", "PATCH"].includes(req.method) && req.path !== "/product-images";
+    if (needsJson && !req.is("application/json")) return next(httpError(415, "La solicitud debe usar application/json"));
+    if (needsJson && (!req.body || typeof req.body !== "object" || Array.isArray(req.body))) {
+      return next(httpError(400, "El cuerpo de la solicitud no es válido"));
+    }
+    next();
+  });
+  app.use("/api", (_req, res, next) => {
+    res.set("Cache-Control", "no-store, max-age=0");
+    res.set("Pragma", "no-cache");
+    next();
+  });
+  app.use("/api", rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false,
+    skip: (req) => req.method === "OPTIONS",
+    message: { message: "Demasiadas solicitudes. Espera unos minutos e intenta nuevamente." }
+  }));
+  app.use("/api", writeLimiter);
 
   app.get("/api-docs.json", (_req, res) => res.json(openApiDocument));
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiDocument, {
@@ -77,18 +144,18 @@ export function createApp() {
 
   app.use("/api", requireAuth);
   app.get("/api/auth/me", (req, res) => res.json({
-    id: req.auth.userId, email: req.auth.email, fullName: req.auth.fullName, role: req.auth.role
+    fullName: req.auth.fullName, role: req.auth.role
   }));
 
   app.get("/api/store", asyncRoute(async (_req, res) => {
     const results = await Promise.all([
       supabase.from("stores").select("timezone").eq("id", storeId).single(),
-      supabase.from("cash_openings").select("*").eq("store_id", storeId).order("business_date", { ascending: false }),
-      supabase.from("products").select("*").eq("store_id", storeId).eq("active", true).order("name"),
-      supabase.from("sales").select("*, sale_items(*)").eq("store_id", storeId).order("created_at", { ascending: false }),
-      supabase.from("inventory_movements").select("*").eq("store_id", storeId).order("created_at", { ascending: false }),
-      supabase.from("cash_closes").select("*, cash_close_expenses(expenses(*))").eq("store_id", storeId).order("business_date", { ascending: false }),
-      supabase.from("expenses").select("*, cash_close_expenses(expense_id)").eq("store_id", storeId).order("created_at", { ascending: false })
+      supabase.from("cash_openings").select("id,business_date,opening_cash,note,created_at").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
+      supabase.from("products").select("id,code,name,category,price,stock,min_stock,image_url").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
+      supabase.from("sales").select("id,folio,created_at,subtotal,discount,total,payment_method,cash_received,change_amount,sale_items(product_id,product_name,quantity,unit_price,subtotal)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
+      supabase.from("inventory_movements").select("id,product_id,product_name,type,quantity,note,created_at").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
+      supabase.from("cash_closes").select("id,business_date,opening_cash,total_sales,cash_sales,card_sales,transfer_sales,total_expenses,expected_cash,actual_cash,difference,created_at,cash_close_expenses(expenses(id,description,amount,created_at))").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
+      supabase.from("expenses").select("id,description,amount,created_at,cash_close_expenses(expense_id)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500)
     ]);
     const [store, openings, products, sales, movements, closes, expenses] = results.map(unwrap);
     const currentDate = dateInTimezone(new Date(), store.timezone);
@@ -114,59 +181,50 @@ export function createApp() {
     if (existingClose) throw httpError(409, "La caja de hoy ya fue cerrada");
     const values = {
       store_id: storeId, business_date: businessDate, opened_by: req.auth.userId,
-      opening_cash: number(req.body.openingCash, "Fondo inicial"), note: req.body.note ? text(req.body.note, "Nota") : null
+      opening_cash: number(req.body.openingCash, "Fondo inicial", 0, 100_000_000),
+      note: optionalText(req.body.note, "Nota", 300)
     };
     const opening = unwrap(await supabase.from("cash_openings").insert(values).select().single());
     res.status(201).json(openingFromDb(opening));
   }));
 
   app.post("/api/products", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
-    if (!categories.includes(req.body.category)) throw httpError(400, "Categoría inválida");
-    const values = {
-      store_id: storeId, name: text(req.body.name, "Nombre"),
-      category: req.body.category, price: number(req.body.price, "Precio"), stock: number(req.body.stock, "Stock"),
-      min_stock: number(req.body.minStock, "Stock mínimo"), image_url: req.body.image || null
-    };
+    const values = { store_id: storeId, ...productValues(req.body) };
     res.status(201).json(productFromDb(unwrap(await supabase.from("products").insert(values).select().single())));
   }));
 
-  app.post("/api/product-images", requireRole("owner", "admin"), imageUpload.single("image"), asyncRoute(async (req, res) => {
+  app.post("/api/product-images", requireRole("owner", "admin"), imageLimiter, imageUpload.single("image"), asyncRoute(async (req, res) => {
     if (!req.file) throw httpError(400, "Selecciona una fotografía");
-    const extensionByType = {
-      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
-      "image/heic": "heic", "image/heif": "heif"
-    };
-    const objectPath = `${storeId}/${randomUUID()}.${extensionByType[req.file.mimetype] ?? "jpg"}`;
+    const detected = await fileTypeFromBuffer(req.file.buffer);
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+    if (!detected || !allowedTypes.has(detected.mime)) throw httpError(400, "El archivo no contiene una fotografía válida");
+    const safeExtension = detected.ext === "jpeg" ? "jpg" : detected.ext;
+    const objectPath = `${storeId}/${randomUUID()}.${safeExtension}`;
     unwrap(await supabase.storage.from("product-images").upload(objectPath, req.file.buffer, {
-      contentType: req.file.mimetype, cacheControl: "31536000", upsert: false
+      contentType: detected.mime, cacheControl: "31536000", upsert: false
     }));
     const { data } = supabase.storage.from("product-images").getPublicUrl(objectPath);
     res.status(201).json({ url: data.publicUrl });
   }));
 
   app.put("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
-    if (!categories.includes(req.body.category)) throw httpError(400, "Categoría inválida");
-    const values = {
-      name: text(req.body.name, "Nombre"), category: req.body.category,
-      price: number(req.body.price, "Precio"), stock: number(req.body.stock, "Stock"),
-      min_stock: number(req.body.minStock, "Stock mínimo"), image_url: req.body.image || null
-    };
-    const result = await supabase.from("products").update(values).eq("store_id", storeId).eq("id", req.params.id).select().single();
+    const productId = uuid(req.params.id, "Producto");
+    const result = await supabase.from("products").update(productValues(req.body)).eq("store_id", storeId).eq("id", productId).select().single();
     res.json(productFromDb(unwrap(result)));
   }));
 
   app.delete("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
-    unwrap(await supabase.from("products").update({ active: false }).eq("store_id", storeId).eq("id", req.params.id).select("id").single());
+    const productId = uuid(req.params.id, "Producto");
+    unwrap(await supabase.from("products").update({ active: false }).eq("store_id", storeId).eq("id", productId).select("id").single());
     res.status(204).end();
   }));
 
   app.post("/api/movements", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     if (!['entrada', 'salida'].includes(req.body.type)) throw httpError(400, "Tipo de movimiento inválido");
-    const quantity = number(req.body.quantity, "Cantidad", 1);
-    if (!Number.isInteger(quantity)) throw httpError(400, "La cantidad debe ser entera");
+    const quantity = integer(req.body.quantity, "Cantidad", 1, 1_000_000);
     const movement = unwrap(await supabase.rpc("register_inventory_movement", {
-      requested_store_id: storeId, requested_product_id: req.body.productId,
-      movement_type: req.body.type, movement_quantity: quantity, movement_note: req.body.note || null
+      requested_store_id: storeId, requested_product_id: uuid(req.body.productId, "Producto"),
+      movement_type: req.body.type, movement_quantity: quantity, movement_note: optionalText(req.body.note, "Nota", 300)
     }));
     await supabase.from("inventory_movements").update({ created_by: req.auth.userId }).eq("id", firstRow(movement).id);
     res.status(201).json(movementFromDb(firstRow(movement)));
@@ -174,7 +232,7 @@ export function createApp() {
 
   app.post("/api/sales", asyncRoute(async (req, res) => {
     if (!paymentMethods.includes(req.body.paymentMethod)) throw httpError(400, "Método de pago inválido");
-    if (!Array.isArray(req.body.items) || req.body.items.length === 0) throw httpError(400, "El carrito está vacío");
+    const items = saleItems(req.body.items);
     const store = unwrap(await supabase.from("stores").select("timezone").eq("id", storeId).single());
     const businessDate = dateInTimezone(new Date(), store.timezone);
     const [opening, close] = await Promise.all([
@@ -185,40 +243,46 @@ export function createApp() {
     if (close) throw httpError(409, "La caja de hoy ya fue cerrada");
     const created = unwrap(await supabase.rpc("complete_sale", {
       requested_store_id: storeId,
-      requested_items: req.body.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      requested_items: items,
       requested_payment_method: req.body.paymentMethod,
-      discount_percent: number(req.body.discount ?? 0, "Descuento"),
-      requested_cash_received: req.body.paymentMethod === "efectivo" ? number(req.body.cashReceived, "Efectivo recibido") : null
+      discount_percent: number(req.body.discount ?? 0, "Descuento", 0, 100),
+      requested_cash_received: req.body.paymentMethod === "efectivo" ? number(req.body.cashReceived, "Efectivo recibido", 0, 100_000_000) : null
     }));
     await supabase.from("sales").update({ sold_by: req.auth.userId }).eq("id", created.id);
     res.status(201).json(await loadSale(created.id));
   }));
 
   app.post("/api/expenses", asyncRoute(async (req, res) => {
-    const values = { store_id: storeId, created_by: req.auth.userId, description: text(req.body.description, "Descripción"), amount: number(req.body.amount, "Monto", 0.01) };
+    const values = { store_id: storeId, created_by: req.auth.userId, description: text(req.body.description, "Descripción", 300), amount: number(req.body.amount, "Monto", 0.01, 100_000_000) };
     res.status(201).json(expenseFromDb(unwrap(await supabase.from("expenses").insert(values).select().single())));
   }));
 
   app.delete("/api/expenses/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
-    const deleted = unwrap(await supabase.rpc("delete_open_expense", { requested_store_id: storeId, requested_expense_id: req.params.id }));
+    const deleted = unwrap(await supabase.rpc("delete_open_expense", { requested_store_id: storeId, requested_expense_id: uuid(req.params.id, "Gasto") }));
     if (!deleted) throw httpError(409, "El gasto no existe o ya fue incluido en un cierre de caja");
     res.status(204).end();
   }));
 
   app.post("/api/cash-closes", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
-    const created = unwrap(await supabase.rpc("close_cash", { requested_store_id: storeId, requested_actual_cash: number(req.body.actualCash, "Efectivo real") }));
+    const created = unwrap(await supabase.rpc("close_cash", { requested_store_id: storeId, requested_actual_cash: number(req.body.actualCash, "Efectivo real", 0, 100_000_000) }));
     await supabase.from("cash_closes").update({ closed_by: req.auth.userId }).eq("id", firstRow(created).id);
     res.status(201).json(await loadClose(firstRow(created).id));
   }));
 
   app.use((_req, res) => res.status(404).json({ message: "Ruta no encontrada" }));
-  app.use((error, _req, res, _next) => {
-    console.error(error);
+  app.use((error, req, res, _next) => {
     if (error instanceof multer.MulterError) {
       const message = error.code === "LIMIT_FILE_SIZE" ? "La fotografía no puede superar 6 MB" : "No se pudo procesar la fotografía";
       return res.status(400).json({ message });
     }
-    res.status(error.status ?? 500).json({ message: error.message || "Error interno del servidor" });
+    const malformedJson = error?.type === "entity.parse.failed";
+    const status = malformedJson ? 400 : Number.isInteger(error?.status) ? error.status : 500;
+    const message = malformedJson ? "El contenido JSON no es válido" : error?.expose ? error.message : "Error interno del servidor";
+    console.error(JSON.stringify({
+      level: "error", requestId: req.requestId, method: req.method, path: req.path,
+      status, code: error?.code ?? "INTERNAL_ERROR", error: error?.message ?? "Unknown error"
+    }));
+    res.status(status).json({ message, requestId: req.requestId });
   });
   return app;
 }
