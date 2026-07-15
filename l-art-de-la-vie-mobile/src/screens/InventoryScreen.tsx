@@ -9,6 +9,7 @@ import { useStore } from "../context/StoreContext";
 import { uploadProductImage } from "../lib/api";
 import { colors, money, shortDate } from "../theme";
 import type { Category, Product } from "../types";
+import { ImageCropper, type CropSource, type CroppedImage } from "../components/ImageCropper";
 
 const categoryOptions: { value: Category; label: string }[] = ["Decoración", "Perfumes", "Carteras", "Varios"].map(value => ({ value: value as Category, label: value }));
 interface ProductForm { name: string; category: Category; price: string; stock: string; minStock: string; image?: string }
@@ -24,6 +25,7 @@ export function InventoryScreen() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(blank);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [cropSource, setCropSource] = useState<CropSource | null>(null);
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -38,8 +40,13 @@ export function InventoryScreen() {
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    setPendingImage({ uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName });
-    setForm(current => ({ ...current, image: asset.uri }));
+    setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+  };
+
+  const useCroppedImage = (image: CroppedImage) => {
+    setPendingImage({ uri: image.uri, mimeType: image.mimeType, fileName: image.fileName });
+    setForm(current => ({ ...current, image: image.uri }));
+    setCropSource(null);
   };
 
   const takePhoto = async () => {
@@ -136,6 +143,7 @@ export function InventoryScreen() {
       <View style={styles.fieldSpacer} /><Field label="Cantidad" value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />
       <Field label="Motivo o nota" value={note} onChangeText={setNote} placeholder="Ej. compra a proveedor" multiline />
     </Sheet>
+    <ImageCropper source={cropSource} onCancel={() => setCropSource(null)} onConfirm={useCroppedImage} />
   </>;
 }
 
