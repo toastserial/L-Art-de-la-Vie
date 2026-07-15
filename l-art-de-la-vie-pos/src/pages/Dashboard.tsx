@@ -26,6 +26,8 @@ export default function Dashboard() {
     const catProducts = products.filter((p) => p.category === cat);
     return { name: cat, stock: catProducts.reduce((s, p) => s + p.stock, 0) };
   });
+  const categoryChartData = categoryData.filter((category) => category.stock > 0);
+  const totalStock = categoryData.reduce((total, category) => total + category.stock, 0);
 
   // Top products by sales count
   const productSalesMap: Record<string, { name: string; count: number }> = {};
@@ -117,17 +119,57 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-lg font-sans">Inventario por Categoría</CardTitle>
           </CardHeader>
-          <CardContent className="h-64 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={categoryData} dataKey="stock" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, stock }) => `${name}: ${stock}`}>
-                  {categoryData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent className="grid min-h-64 grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="h-52 min-w-0">
+              {totalStock > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryChartData}
+                      dataKey="stock"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={78}
+                      paddingAngle={categoryChartData.length > 1 ? 3 : 0}
+                      stroke="hsl(var(--card))"
+                      strokeWidth={3}
+                    >
+                      {categoryChartData.map((category) => {
+                        const colorIndex = categoryData.findIndex((item) => item.name === category.name);
+                        return <Cell key={category.name} fill={COLORS[colorIndex]} />;
+                      })}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => [`${value} unidades`, "Stock"]} />
+                    <text x="50%" y="47%" textAnchor="middle" className="fill-muted-foreground text-[11px]">
+                      Total
+                    </text>
+                    <text x="50%" y="58%" textAnchor="middle" className="fill-foreground text-xl font-bold">
+                      {totalStock}
+                    </text>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 text-center">
+                  <Package className="mb-2 h-7 w-7 text-muted-foreground" />
+                  <p className="text-sm font-medium">Inventario vacío</p>
+                  <p className="text-xs text-muted-foreground">Agrega existencias para ver la distribución.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              {categoryData.map((category, index) => (
+                <div key={category.name} className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index] }} />
+                    <span className="truncate text-xs text-muted-foreground">{category.name}</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">{category.stock}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>

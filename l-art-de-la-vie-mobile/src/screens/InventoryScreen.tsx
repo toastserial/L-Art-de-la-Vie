@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { File, Paths } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useMemo, useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -13,7 +14,7 @@ import { ImageCropper, type CropSource, type CroppedImage } from "../components/
 
 const categoryOptions: { value: Category; label: string }[] = ["Decoración", "Perfumes", "Carteras", "Varios"].map(value => ({ value: value as Category, label: value }));
 interface ProductForm { name: string; category: Category; price: string; stock: string; minStock: string; image?: string }
-interface PendingImage { uri: string; mimeType?: string | null; fileName?: string | null }
+interface PendingImage { uri: string; width: number; height: number; mimeType?: string | null; fileName?: string | null }
 const blank: ProductForm = { name: "", category: "Decoración", price: "", stock: "", minStock: "3" };
 
 export function InventoryScreen() {
@@ -26,6 +27,7 @@ export function InventoryScreen() {
   const [form, setForm] = useState(blank);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [cropSource, setCropSource] = useState<CropSource | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -34,8 +36,8 @@ export function InventoryScreen() {
   const [busy, setBusy] = useState(false);
 
   const filtered = useMemo(() => products.filter(product => `${product.name} ${product.code} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
-  const openNew = () => { setEditing(null); setPendingImage(null); setForm(blank); setProductOpen(true); };
-  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setForm({ name: product.name, category: product.category, price: String(product.price), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
+  const openNew = () => { setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm(blank); setProductOpen(true); };
+  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ name: product.name, category: product.category, price: String(product.price), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
@@ -44,9 +46,34 @@ export function InventoryScreen() {
   };
 
   const useCroppedImage = (image: CroppedImage) => {
-    setPendingImage({ uri: image.uri, mimeType: image.mimeType, fileName: image.fileName });
+    setPendingImage({ uri: image.uri, width: image.width, height: image.height, mimeType: image.mimeType, fileName: image.fileName });
     setForm(current => ({ ...current, image: image.uri }));
     setCropSource(null);
+  };
+
+  const imageSize = (uri: string) => new Promise<CropSource>((resolve, reject) => {
+    Image.getSize(uri, (width, height) => resolve({ uri, width, height }), reject);
+  });
+
+  const editCurrentPhoto = async () => {
+    if (!form.image || preparingImage) return;
+    setPreparingImage(true);
+    try {
+      if (pendingImage?.uri === form.image) {
+        setCropSource({ uri: pendingImage.uri, width: pendingImage.width, height: pendingImage.height });
+        return;
+      }
+      const extension = form.image.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1]?.toLowerCase() || "jpg";
+      const destination = new File(Paths.cache, `producto-editar-${Date.now()}.${extension}`);
+      const localFile = /^https?:\/\//i.test(form.image)
+        ? await File.downloadFileAsync(form.image, destination)
+        : new File(form.image);
+      setCropSource(await imageSize(localFile.uri));
+    } catch {
+      Alert.alert("No se pudo editar la fotografía", "Prueba cambiándola por una foto de la cámara o galería.");
+    } finally {
+      setPreparingImage(false);
+    }
   };
 
   const takePhoto = async () => {
@@ -120,13 +147,17 @@ export function InventoryScreen() {
 
     <Sheet visible={productOpen} onClose={() => setProductOpen(false)} title={editing ? "Editar producto" : "Nuevo producto"} footer={<View style={styles.footerRow}>{editing && <Button title="Eliminar" variant="danger" icon="trash-can-outline" onPress={() => Alert.alert("Eliminar producto", `¿Desactivar ${editing.name}?`, [{ text: "Cancelar" }, { text: "Eliminar", style: "destructive", onPress: async () => { try { await deleteProduct(editing.id); setProductOpen(false); } catch (reason) { Alert.alert("No se eliminó", reason instanceof Error ? reason.message : "Intenta nuevamente"); } } }])} style={styles.footerDelete} />}<Button title="Guardar" icon="content-save-outline" onPress={saveProduct} loading={busy} style={styles.footerSave} /></View>}>
       <View style={styles.photoSection}>
-        <Pressable onPress={selectPhoto} style={styles.photoPicker}>
+        <Pressable onPress={() => form.image ? editCurrentPhoto() : selectPhoto()} disabled={preparingImage} style={styles.photoPicker}>
           {form.image ? <Image source={{ uri: form.image }} style={styles.photoPreview} /> : <View style={styles.photoEmpty}><MaterialCommunityIcons name="camera-plus-outline" size={30} color={colors.forest} /><Text style={styles.photoEmptyTitle}>Agregar fotografía</Text><Text style={styles.photoEmptyCopy}>Cámara o galería</Text></View>}
           <View style={styles.photoEdit}><MaterialCommunityIcons name="camera" size={17} color={colors.white} /></View>
         </Pressable>
         <View style={styles.photoHelp}>
           <Text style={styles.photoTitle}>{form.image ? "Fotografía seleccionada" : "Imagen opcional"}</Text>
-          <Text style={styles.photoCopy}>Centra el producto; la app ajustará la imagen automáticamente.</Text>
+          <Text style={styles.photoCopy}>{form.image ? "Puedes reemplazarla o volver a ajustar su encuadre." : "Centra el producto; la app ajustará la imagen automáticamente."}</Text>
+          <View style={styles.photoActions}>
+            <Button title={form.image ? "Cambiar" : "Agregar"} icon="image-plus" variant="secondary" compact onPress={selectPhoto} />
+            {form.image && <Button title="Reencuadrar" icon="crop" variant="ghost" compact loading={preparingImage} onPress={() => editCurrentPhoto()} />}
+          </View>
           {form.image && <Pressable onPress={() => { setPendingImage(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
         </View>
       </View>
@@ -161,5 +192,5 @@ const styles = StyleSheet.create({
   photoPreview: { width: "100%", height: "100%" },
   photoEmpty: { flex: 1, alignItems: "center", justifyContent: "center" }, photoEmptyTitle: { color: colors.forest, fontSize: 11, fontWeight: "800", marginTop: 5 }, photoEmptyCopy: { color: colors.muted, fontSize: 9, marginTop: 2 },
   photoEdit: { position: "absolute", right: 7, bottom: 7, width: 30, height: 30, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
-  photoHelp: { flex: 1 }, photoTitle: { color: colors.ink, fontWeight: "800", fontSize: 13 }, photoCopy: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 }, removePhoto: { color: colors.danger, fontSize: 11, fontWeight: "800", marginTop: 9 },
+  photoHelp: { flex: 1 }, photoTitle: { color: colors.ink, fontWeight: "800", fontSize: 13 }, photoCopy: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 }, photoActions: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 }, removePhoto: { color: colors.danger, fontSize: 11, fontWeight: "800", marginTop: 9 },
 });
