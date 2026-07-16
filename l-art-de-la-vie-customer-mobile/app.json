@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "L'Art de la Vie",
+    "slug": "l-art-de-la-vie-clientes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "lartdelavieclientes",
+    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#FAF8F2" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.lartdelavie.clientes" },
+    "android": {
+      "package": "com.lartdelavie.clientes",
+      "adaptiveIcon": { "backgroundColor": "#073B20", "foregroundImage": "./assets/icon.png" }
+    },
+    "plugins": ["expo-sqlite"]
+  }
+}

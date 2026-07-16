@@ -71,6 +71,29 @@ paths:
                   products:
                     type: array
                     items: { $ref: '#/components/schemas/CatalogProduct' }
+  /api/customer/me:
+    get:
+      tags: [Clientes]
+      summary: Perfil del comprador autenticado
+      responses:
+        '200':
+          description: Perfil del comprador
+    put:
+      tags: [Clientes]
+      summary: Actualiza nombre y teléfono del comprador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName: { type: string, maxLength: 120 }
+                phone: { type: string, maxLength: 30 }
+      responses:
+        '200':
+          description: Perfil actualizado
   /api/auth/me:
     get:
       tags: [Autenticación]

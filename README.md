@@ -7,6 +7,7 @@ Sistema privado de punto de venta con aplicaciones web y móvil, Express y Supab
 - `l-art-de-la-vie-pos`: frontend web React/Vite.
 - `l-art-de-la-vie-api`: backend Express y migraciones Supabase.
 - `l-art-de-la-vie-mobile`: aplicación Android/iOS con Expo y React Native.
+- `l-art-de-la-vie-customer-mobile`: aplicación Expo separada para compradores.
 - `l-art-de-la-vie-store`: tienda pública React/Vite para clientes.
 
 Documentación detallada de arquitectura, componentes, base de datos, Git y despliegue: [`docs/SYSTEM_GUIDE.md`](docs/SYSTEM_GUIDE.md).

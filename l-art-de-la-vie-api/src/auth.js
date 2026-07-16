@@ -7,30 +7,41 @@ const displayName = (storedName, email) => {
   return cleanName && !cleanName.includes("@") ? cleanName : username || "Usuario";
 };
 
+async function identityFromRequest(req) {
+  const [scheme, token] = (req.get("authorization") ?? "").split(" ");
+  if (scheme !== "Bearer" || !token) throw httpError(401, "Inicia sesión para continuar");
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) throw httpError(401, "La sesión no es válida o expiró");
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  return {
+    userId: user.id,
+    email: user.email ?? "",
+    fullName: displayName(profile?.full_name || user.user_metadata?.full_name, user.email),
+    role: null,
+  };
+}
+
+export async function requireUserAuth(req, _res, next) {
+  try {
+    req.auth = await identityFromRequest(req);
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function requireAuth(req, _res, next) {
   try {
-    const [scheme, token] = (req.get("authorization") ?? "").split(" ");
-    if (scheme !== "Bearer" || !token) throw httpError(401, "Inicia sesión para continuar");
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) throw httpError(401, "La sesión no es válida o expiró");
-
-    const { data: membership, error: memberError } = await supabase
+    const identity = await identityFromRequest(req);
+    const { data: membership, error } = await supabase
       .from("store_members")
       .select("role")
       .eq("store_id", storeId)
-      .eq("user_id", user.id)
+      .eq("user_id", identity.userId)
       .single();
-    if (memberError || !membership) throw httpError(403, "Tu usuario no tiene acceso a esta tienda");
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-
-    const storedName = profile?.full_name || user.user_metadata?.full_name;
-
-    req.auth = {
-      userId: user.id,
-      fullName: displayName(storedName, user.email),
-      role: membership.role
-    };
+    if (error || !membership) throw httpError(403, "Tu usuario no tiene acceso a esta tienda");
+    req.auth = { ...identity, role: membership.role };
     next();
   } catch (error) {
     next(error);

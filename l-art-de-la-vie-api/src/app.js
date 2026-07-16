@@ -11,7 +11,7 @@ import YAML from "yaml";
 import { closeFromDb, expenseFromDb, movementFromDb, openingFromDb, productFromDb, saleFromDb } from "./mappers.js";
 import { storeId, supabase, unwrap } from "./supabase.js";
 import { httpError, integer, number, optionalText, text, uuid } from "./validation.js";
-import { requireAuth, requireRole } from "./auth.js";
+import { requireAuth, requireRole, requireUserAuth } from "./auth.js";
 
 const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
@@ -190,6 +190,32 @@ export function createApp() {
         ...(product.image_url ? { image: product.image_url } : {})
       }))
     });
+  }));
+
+  app.get("/api/customer/me", requireUserAuth, asyncRoute(async (req, res) => {
+    const account = unwrap(await supabase.from("customer_accounts")
+      .select("phone,created_at")
+      .eq("user_id", req.auth.userId)
+      .maybeSingle());
+    res.json({
+      id: req.auth.userId,
+      email: req.auth.email,
+      fullName: req.auth.fullName,
+      phone: account?.phone ?? "",
+      customerSince: account?.created_at ?? null
+    });
+  }));
+
+  app.put("/api/customer/me", requireUserAuth, asyncRoute(async (req, res) => {
+    const fullName = text(req.body.fullName, "Nombre", 120);
+    const phone = optionalText(req.body.phone, "Teléfono", 30);
+    unwrap(await supabase.from("profiles").update({ full_name: fullName }).eq("id", req.auth.userId));
+    unwrap(await supabase.from("customer_accounts").upsert({
+      user_id: req.auth.userId,
+      phone,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" }));
+    res.json({ id: req.auth.userId, email: req.auth.email, fullName, phone: phone ?? "" });
   }));
 
   app.use("/api", requireAuth);
