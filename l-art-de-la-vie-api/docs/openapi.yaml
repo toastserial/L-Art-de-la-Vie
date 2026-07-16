@@ -55,6 +55,22 @@ paths:
                   status: { type: string, example: ok }
                   database: { type: string, example: supabase }
         '500': { $ref: '#/components/responses/InternalError' }
+  /api/catalog:
+    get:
+      tags: [Tienda]
+      summary: Catálogo público con precio y disponibilidad
+      security: []
+      responses:
+        '200':
+          description: Productos visibles en la tienda en línea
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items: { $ref: '#/components/schemas/CatalogProduct' }
   /api/auth/me:
     get:
       tags: [Autenticación]
@@ -337,6 +353,16 @@ components:
         price: { type: number, format: double, minimum: 0, example: 250 }
         stock: { type: integer, minimum: 0, example: 10 }
         minStock: { type: integer, minimum: 0, example: 3 }
+        image: { type: string, format: uri }
+    CatalogProduct:
+      type: object
+      required: [id, name, category, price, stock]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { type: string, enum: [Decoración, Perfumes, Carteras, Varios] }
+        price: { type: number, format: double }
+        stock: { type: integer, minimum: 0 }
         image: { type: string, format: uri }
     Product:
       allOf:

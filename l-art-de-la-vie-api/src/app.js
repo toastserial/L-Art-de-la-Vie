@@ -83,7 +83,9 @@ async function loadClose(id) {
 
 export function createApp() {
   const app = express();
-  const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:8080")
+  const allowedOrigins = [process.env.FRONTEND_ORIGIN ?? "http://localhost:8080", process.env.STOREFRONT_ORIGIN]
+    .filter(Boolean)
+    .join(",")
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""));
   app.set("trust proxy", 1);
@@ -167,6 +169,27 @@ export function createApp() {
   app.get("/api/health", asyncRoute(async (_req, res) => {
     unwrap(await supabase.from("stores").select("id").eq("id", storeId).single());
     res.json({ status: "ok", database: "supabase" });
+  }));
+
+  app.get("/api/catalog", asyncRoute(async (_req, res) => {
+    const products = unwrap(await supabase
+      .from("products")
+      .select("id,name,category,price,stock,image_url")
+      .eq("store_id", storeId)
+      .eq("active", true)
+      .order("name")
+      .limit(500));
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
+    res.json({
+      products: products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        category: product.category,
+        price: Number(product.price),
+        stock: product.stock,
+        ...(product.image_url ? { image: product.image_url } : {})
+      }))
+    });
   }));
 
   app.use("/api", requireAuth);
