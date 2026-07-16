@@ -1,7 +1,7 @@
-import { MessageCircle } from "lucide-react";
 import { config, hasWhatsapp } from "@/lib/config";
 import { whatsappHelloUrl } from "@/lib/whatsapp";
 import { motion } from "framer-motion";
+import { WhatsAppIcon } from "./WhatsAppIcon";
 
 export function WhatsAppButton({ hidden = false }: { hidden?: boolean }) {
   if (!hasWhatsapp()) return null;
@@ -22,7 +22,7 @@ export function WhatsAppButton({ hidden = false }: { hidden?: boolean }) {
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
     >
       <span className="grid h-8 w-8 place-items-center rounded-full bg-[color:var(--gold)] text-[color:var(--forest)]">
-        <MessageCircle className="h-4 w-4" strokeWidth={2.2} />
+        <WhatsAppIcon className="h-4.5 w-4.5" />
       </span>
       <span className="hidden sm:inline">Hola, ¿te ayudamos?</span>
     </motion.a>

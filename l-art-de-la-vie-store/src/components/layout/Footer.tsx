@@ -2,6 +2,7 @@ import { Instagram, MapPin, ArrowUp } from "lucide-react";
 import { Logo } from "@/components/shared/Logo";
 import { config, hasWhatsapp } from "@/lib/config";
 import { whatsappHelloUrl } from "@/lib/whatsapp";
+import { WhatsAppIcon } from "@/components/shared/WhatsAppIcon";
 
 function TikTokIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -86,9 +87,9 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
-                  className="inline-flex min-h-11 items-center rounded-full border border-white/20 px-4 text-sm transition hover:border-[color:var(--gold)] hover:text-[color:var(--gold)]"
+                  className="inline-grid h-11 w-11 place-items-center rounded-full border border-white/20 transition hover:border-[color:var(--gold)] hover:text-[color:var(--gold)]"
                 >
-                  WhatsApp {config.whatsappDisplay ? `· ${config.whatsappDisplay}` : ""}
+                  <WhatsAppIcon className="h-5 w-5" />
                 </a>
               ) : null}
             </div>

@@ -1,9 +1,10 @@
-import { MapPin, Clock, Phone, ArrowUpRight } from "lucide-react";
+import { MapPin, Clock, ArrowUpRight } from "lucide-react";
 import { SectionHeading } from "@/components/shared/SectionHeading";
 import { config, hasWhatsapp } from "@/lib/config";
 import { whatsappHelloUrl } from "@/lib/whatsapp";
 import storeImg from "@/assets/store.jpg";
 import { motion } from "framer-motion";
+import { WhatsAppIcon } from "@/components/shared/WhatsAppIcon";
 
 export function StoreInformation() {
   return (
@@ -46,7 +47,7 @@ export function StoreInformation() {
             {hasWhatsapp() ? (
               <li className="flex items-start gap-4">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[color:var(--paper)] text-[color:var(--forest)]">
-                  <Phone className="h-4 w-4" />
+                  <WhatsAppIcon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--forest-2)]">
