@@ -23,7 +23,14 @@ export const shadow = {
   elevation: 3,
 };
 
-export const money = (value: number) => `L ${value.toFixed(2)}`;
+export const money = (value: number) => {
+  const amount = Number.isFinite(value) ? value : 0;
+  const formatted = Math.abs(amount).toLocaleString("es-HN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${amount < 0 ? "-" : ""}L ${formatted}`;
+};
 
 export const localDay = (value: string | Date) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Tegucigalpa",

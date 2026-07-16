@@ -199,7 +199,7 @@ export default function CashClose() {
                     <div className="flex justify-between text-sm">
                       <span>Diferencia</span>
                       <span className={`font-bold ${difference === 0 ? "text-primary" : difference > 0 ? "text-accent" : "text-destructive"}`}>
-                        {difference > 0 ? "+" : ""}{difference.toFixed(2)}
+                        {difference > 0 ? "+L " : difference < 0 ? "-L " : "L "}{Math.abs(difference).toFixed(2)}
                         {difference === 0 ? " ✓" : difference > 0 ? " (sobrante)" : " (faltante)"}
                       </span>
                     </div>
@@ -211,7 +211,7 @@ export default function CashClose() {
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>¿Cerrar caja del día?</AlertDialogTitle>
-                        <AlertDialogDescription>Se registrará el cierre con efectivo contado: L {actualCash.toFixed(2)} (diferencia: {difference >= 0 ? "+" : ""}{difference.toFixed(2)}). Esta acción no se puede deshacer.</AlertDialogDescription>
+                        <AlertDialogDescription>Se registrará el cierre con efectivo contado: L {actualCash.toFixed(2)} (diferencia: {difference > 0 ? "+L " : difference < 0 ? "-L " : "L "}{Math.abs(difference).toFixed(2)}). Esta acción no se puede deshacer.</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -245,14 +245,14 @@ export default function CashClose() {
                   {cashCloses.map((cc) => (
                     <TableRow key={cc.id}>
                       <TableCell>{new Date(cc.date).toLocaleDateString("es")}</TableCell>
-                      <TableCell className="text-right">${cc.totalSales.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">L {cc.totalSales.toFixed(2)}</TableCell>
                       <TableCell className="text-right">L {cc.openingCash.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-destructive">${cc.totalExpenses.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${cc.expectedCash.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${cc.actualCash.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-destructive">-L {cc.totalExpenses.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">L {cc.expectedCash.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">L {cc.actualCash.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={cc.difference === 0 ? "default" : "destructive"}>
-                          {cc.difference >= 0 ? "+" : ""}{cc.difference.toFixed(2)}
+                          {cc.difference > 0 ? "+L " : cc.difference < 0 ? "-L " : "L "}{Math.abs(cc.difference).toFixed(2)}
                         </Badge>
                       </TableCell>
                     </TableRow>
