@@ -1,27 +1,27 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { Session } from "@supabase/supabase-js";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { api } from "./src/lib/api";
-import { supabase } from "./src/lib/supabase";
+import { authRedirectUrl, handleAuthDeepLink, supabase } from "./src/lib/supabase";
 import { colors, money } from "./src/theme";
 import type { CartItem, Customer, Product } from "./src/types";
 import { HomeScreen } from "./src/screens/HomeScreen";
@@ -36,6 +36,9 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tab, setTab] = useState<Tab>("home");
+  const [catalogCategory, setCatalogCategory] = useState<string>();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -66,13 +69,37 @@ export default function App() {
         if (mounted) setLoading(false);
       }
     };
-    supabase.auth.getSession().then(({ data }) => sync(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) =>
-      setTimeout(() => sync(next), 0),
-    );
+    const processAuthUrl = async (url: string | null) => {
+      if (!url) return;
+      try {
+        const authAction = await handleAuthDeepLink(url);
+        if (authAction === "recovery") setRecoveringPassword(true);
+        if (authAction === "confirmation") {
+          Alert.alert("Correo confirmado", "Tu cuenta ya está lista para usar.");
+        }
+      } catch (error) {
+        Alert.alert(
+          "No pudimos confirmar el correo",
+          error instanceof Error ? error.message : "Solicita un enlace nuevo e intenta otra vez.",
+        );
+      }
+    };
+    Linking.getInitialURL().then(async (url) => {
+      await processAuthUrl(url);
+      const { data } = await supabase.auth.getSession();
+      sync(data.session);
+    });
+    const linkSubscription = Linking.addEventListener("url", ({ url }) => {
+      void processAuthUrl(url);
+    });
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === "PASSWORD_RECOVERY") setRecoveringPassword(true);
+      setTimeout(() => sync(next), 0);
+    });
     return () => {
       mounted = false;
       data.subscription.unsubscribe();
+      linkSubscription.remove();
     };
   }, []);
 
@@ -109,11 +136,21 @@ export default function App() {
       }).start();
     });
   };
+  const openCatalog = (category?: string) => {
+    setCatalogCategory(category);
+    changeTab("catalog");
+  };
 
   if (loading)
     return (
       <SafeAreaProvider>
         <Loading />
+      </SafeAreaProvider>
+    );
+  if (recoveringPassword && session)
+    return (
+      <SafeAreaProvider>
+        <PasswordRecoveryScreen onDone={() => setRecoveringPassword(false)} />
       </SafeAreaProvider>
     );
   if (!session || !customer)
@@ -127,7 +164,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" backgroundColor={colors.cream} />
       <SafeAreaView style={styles.app}>
-        <Header customer={customer} />
+        <Header customer={customer} onProfile={() => changeTab("profile")} />
         <Animated.View
           style={[
             styles.body,
@@ -148,11 +185,18 @@ export default function App() {
             <HomeScreen
               customer={customer}
               products={products}
-              onCatalog={() => changeTab("catalog")}
+              onCatalog={openCatalog}
+              onProduct={setSelectedProduct}
             />
           )}
           {tab === "catalog" && (
-            <CatalogScreen products={products} onAdd={add} />
+            <CatalogScreen
+              key={catalogCategory || "all"}
+              products={products}
+              initialCategory={catalogCategory}
+              onProduct={setSelectedProduct}
+              onAdd={add}
+            />
           )}
           {tab === "cart" && (
             <Cart items={cart} setQuantity={setQuantity} customer={customer} />
@@ -162,8 +206,75 @@ export default function App() {
           )}
         </Animated.View>
         <BottomNav active={tab} onChange={changeTab} count={count} />
+        <ProductDetail
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onAdd={(product) => {
+            add(product);
+            setSelectedProduct(null);
+          }}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
+  );
+}
+
+function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const savePassword = async () => {
+    if (password.length < 8) {
+      return Alert.alert("Contraseña muy corta", "Usa al menos 8 caracteres.");
+    }
+    if (password !== confirmation) {
+      return Alert.alert("Las contraseñas no coinciden", "Escribe la misma contraseña en ambos campos.");
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (error) return Alert.alert("No pudimos cambiarla", error.message);
+    Alert.alert("Contraseña actualizada", "Ya puedes continuar usando tu cuenta.", [
+      { text: "Continuar", onPress: onDone },
+    ]);
+  };
+
+  return (
+    <KeyboardAvoidingView style={styles.auth} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <StatusBar style="dark" backgroundColor={colors.cream} />
+      <Image source={require("./assets/hero-boutique.jpg")} style={styles.authBackdrop} />
+      <LinearGradient colors={["rgba(250,248,242,.12)", colors.cream]} style={styles.authShade} />
+      <View style={styles.authCard}>
+        <View style={styles.authBrand}>
+          <View style={styles.confirmationIcon}>
+            <MaterialCommunityIcons name="lock-reset" size={34} color={colors.forest} />
+          </View>
+          <Text style={styles.authEyebrow}>SEGURIDAD</Text>
+          <Text style={styles.cardTitle}>Crea una nueva contraseña</Text>
+          <Text style={styles.authCopy}>Debe contener al menos 8 caracteres y ser difícil de adivinar.</Text>
+        </View>
+        <Input
+          label="Nueva contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          trailing={
+            <Pressable onPress={() => setShowPassword((value) => !value)} hitSlop={10}>
+              <MaterialCommunityIcons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+            </Pressable>
+          }
+        />
+        <Input
+          label="Confirmar contraseña"
+          value={confirmation}
+          onChangeText={setConfirmation}
+          secureTextEntry={!showPassword}
+        />
+        <PrimaryButton title={busy ? "Guardando…" : "Guardar nueva contraseña"} onPress={savePassword} disabled={busy} />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -173,6 +284,9 @@ function AuthScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [resending, setResending] = useState(false);
   const submit = async () => {
     if (!email.trim() || password.length < 6 || (register && !fullName.trim()))
       return Alert.alert(
@@ -185,7 +299,10 @@ function AuthScreen() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: fullName.trim() } },
+          options: {
+            emailRedirectTo: authRedirectUrl,
+            data: { full_name: fullName.trim() },
+          },
         });
         if (error) throw error;
         if (data.session)
@@ -194,10 +311,7 @@ function AuthScreen() {
             body: JSON.stringify({ fullName: fullName.trim(), phone: "" }),
           });
         else
-          Alert.alert(
-            "Revisa tu correo",
-            "Confirma tu cuenta y luego inicia sesión.",
-          );
+          setConfirmationEmail(email.trim());
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -216,25 +330,78 @@ function AuthScreen() {
       setBusy(false);
     }
   };
+  const resetPassword = async () => {
+    if (!email.trim()) return Alert.alert("Escribe tu correo", "Así podremos enviarte las instrucciones.");
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: authRedirectUrl,
+    });
+    if (error) return Alert.alert("No fue posible enviar el correo", error.message);
+    Alert.alert("Revisa tu correo", "Te enviamos las instrucciones para recuperar tu acceso.");
+  };
+  const resendConfirmation = async () => {
+    setResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: confirmationEmail,
+      options: { emailRedirectTo: authRedirectUrl },
+    });
+    setResending(false);
+    if (error) return Alert.alert("No pudimos reenviarlo", "Espera un momento e intenta nuevamente.");
+    Alert.alert("Correo reenviado", "Revisa también Spam o Correo no deseado.");
+  };
   return (
     <KeyboardAvoidingView
       style={styles.auth}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar style="light" backgroundColor={colors.forest} />
-      <View style={styles.authBrand}>
-        <Image source={require("./assets/logo.png")} style={styles.authLogo} />
-        <Text style={styles.authEyebrow}>L'ART DE LA VIE</Text>
-        <Text style={styles.authTitle}>Tu boutique, más cerca de ti.</Text>
-        <Text style={styles.authCopy}>
-          Descubre novedades, guarda tus favoritos y prepara tus pedidos desde
-          cualquier ciudad de Honduras.
-        </Text>
-      </View>
+      <StatusBar style="dark" backgroundColor={colors.cream} />
+      <Image
+        source={require("./assets/hero-boutique.jpg")}
+        style={styles.authBackdrop}
+      />
+      <LinearGradient
+        colors={["rgba(250,248,242,.12)", colors.cream]}
+        style={styles.authShade}
+      />
       <View style={styles.authCard}>
-        <Text style={styles.cardTitle}>
-          {register ? "Crear cuenta" : "Bienvenida"}
-        </Text>
+        {confirmationEmail ? (
+          <View style={styles.confirmation}>
+            <View style={styles.confirmationIcon}>
+              <MaterialCommunityIcons name="email-check-outline" size={34} color={colors.forest} />
+            </View>
+            <Text style={styles.cardTitle}>Confirma tu correo</Text>
+            <Text style={styles.confirmationCopy}>
+              Enviamos un enlace a {confirmationEmail}. Ábrelo desde este teléfono;
+              la aplicación regresará automáticamente con tu cuenta confirmada.
+            </Text>
+            <Text style={styles.confirmationHint}>
+              Si no aparece, revisa Spam o Correo no deseado.
+            </Text>
+            <PrimaryButton
+              title="Ya revisé mi correo"
+              onPress={() => {
+                setConfirmationEmail("");
+                setRegister(false);
+              }}
+            />
+            <Pressable disabled={resending} onPress={resendConfirmation}>
+              <Text style={styles.resetLink}>
+                {resending ? "Reenviando…" : "¿No llegó? Reenviar correo"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+        <View style={styles.authBrand}>
+          <Image source={require("./assets/logo.png")} style={styles.authLogo} />
+          <Text style={styles.authEyebrow}>BOUTIQUE</Text>
+          <Text style={styles.cardTitle}>{register ? "Crea tu cuenta" : "Bienvenido de vuelta"}</Text>
+          <Text style={styles.authCopy}>
+            {register
+              ? "Descubre piezas curadas para transformar tus rincones."
+              : "Ingresa para continuar tu experiencia."}
+          </Text>
+        </View>
         {register && (
           <Input
             label="Nombre completo"
@@ -253,7 +420,16 @@ function AuthScreen() {
           label="Contraseña"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
+          secureTextEntry={!showPassword}
+          trailing={
+            <Pressable onPress={() => setShowPassword((value) => !value)} hitSlop={10}>
+              <MaterialCommunityIcons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
+          }
         />
         <PrimaryButton
           title={
@@ -262,108 +438,36 @@ function AuthScreen() {
           onPress={submit}
           disabled={busy}
         />
+        {!register ? (
+          <Pressable onPress={resetPassword}>
+            <Text style={styles.resetLink}>¿Olvidaste tu contraseña?</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => setRegister(!register)}>
           <Text style={styles.link}>
-            {register ? "Ya tengo cuenta" : "Crear una cuenta nueva"}
+            {register ? "Volver a iniciar sesión" : "¿Nuevo por aquí? Crear cuenta"}
           </Text>
         </Pressable>
+          </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-function Header({ customer }: { customer: Customer }) {
+function Header({ customer, onProfile }: { customer: Customer; onProfile: () => void }) {
   return (
     <View style={styles.header}>
       <Image source={require("./assets/logo.png")} style={styles.logo} />
       <View style={{ flex: 1 }}>
+        <Text style={styles.brandEyebrow}>BOUTIQUE</Text>
         <Text style={styles.brand}>L'Art de la Vie</Text>
-        <Text style={styles.mini}>Hola, {customer.fullName.split(" ")[0]}</Text>
       </View>
-      <View style={styles.avatar}>
+      <Pressable onPress={onProfile} style={styles.avatar}>
         <Text style={styles.avatarText}>
           {customer.fullName.charAt(0).toUpperCase()}
         </Text>
-      </View>
-    </View>
-  );
-}
-
-function Home({
-  customer,
-  products,
-  onCatalog,
-}: {
-  customer: Customer;
-  products: Product[];
-  onCatalog: () => void;
-}) {
-  const featured = products.filter((p) => p.stock > 0).slice(0, 4);
-  return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Text style={styles.eyebrow}>LUJO ACCESIBLE</Text>
-      <Text style={styles.heroTitle}>
-        Detalles que hacen de la vida un arte.
-      </Text>
-      <Text style={styles.heroCopy}>
-        Bienvenida, {customer.fullName.split(" ")[0]}. Explora piezas
-        seleccionadas y recibe tu pedido donde estés.
-      </Text>
-      <PrimaryButton title="Ver colección" onPress={onCatalog} />
-      <Text style={styles.sectionTitle}>Recién llegados</Text>
-      <View style={styles.featured}>
-        {featured.map((product) => (
-          <MiniProduct key={product.id} product={product} />
-        ))}
-      </View>
-      <View style={styles.shipping}>
-        <MaterialCommunityIcons
-          name="truck-fast-outline"
-          size={28}
-          color={colors.gold}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.shippingTitle}>Envíos en Honduras</Text>
-          <Text style={styles.shippingCopy}>
-            Coordinamos disponibilidad, destino y costo contigo.
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
-  );
-}
-
-function Catalog({
-  products,
-  onAdd,
-}: {
-  products: Product[];
-  onAdd: (p: Product) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const filtered = products.filter((p) =>
-    `${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  return (
-    <View style={styles.listPage}>
-      <Text style={styles.pageTitle}>Colección</Text>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Buscar productos"
-        placeholderTextColor={colors.muted}
-        style={styles.search}
-      />
-      <FlatList
-        data={filtered}
-        keyExtractor={(p) => p.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columns}
-        contentContainerStyle={{ paddingBottom: 28 }}
-        renderItem={({ item }) => (
-          <ProductCard product={item} onAdd={() => onAdd(item)} />
-        )}
-      />
+      </Pressable>
     </View>
   );
 }
@@ -403,7 +507,8 @@ function Cart({
     );
   };
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+      <Text style={styles.pageEyebrow}>TU SELECCIÓN</Text>
       <Text style={styles.pageTitle}>Mi bolsa</Text>
       {!items.length ? (
         <Empty
@@ -424,38 +529,57 @@ function Cart({
                 />
               </View>
             )}
-            <View style={{ flex: 1 }}>
+            <View style={styles.cartInfo}>
               <Text style={styles.productName}>{item.name}</Text>
               <Text style={styles.muted}>{money(item.price)}</Text>
+              <View style={styles.quantityRow}>
+                <Pressable
+                  style={styles.qty}
+                  onPress={() => setQuantity(item.id, item.quantity - 1)}
+                >
+                  <MaterialCommunityIcons name="minus" size={15} color={colors.ink} />
+                </Pressable>
+                <Text style={styles.qtyText}>{item.quantity}</Text>
+                <Pressable
+                  style={styles.qty}
+                  disabled={item.quantity >= item.stock}
+                  onPress={() => setQuantity(item.id, item.quantity + 1)}
+                >
+                  <MaterialCommunityIcons name="plus" size={15} color={colors.ink} />
+                </Pressable>
+              </View>
             </View>
             <Pressable
-              style={styles.qty}
-              onPress={() => setQuantity(item.id, item.quantity - 1)}
+              style={styles.remove}
+              onPress={() => setQuantity(item.id, 0)}
             >
-              <Text>−</Text>
-            </Pressable>
-            <Text style={styles.qtyText}>{item.quantity}</Text>
-            <Pressable
-              style={styles.qty}
-              onPress={() => setQuantity(item.id, item.quantity + 1)}
-            >
-              <Text>+</Text>
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.muted} />
             </Pressable>
           </View>
         ))
       )}
       {items.length > 0 && (
         <>
+          <View style={styles.deliveryNote}>
+            <MaterialCommunityIcons name="truck-fast-outline" size={19} color={colors.forest} />
+            <Text style={styles.deliveryText}>
+              El costo de envío se confirma según tu ciudad y dirección.
+            </Text>
+          </View>
           <View style={styles.orderSummary}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryCopy}>Subtotal ({items.length} piezas)</Text>
+              <Text style={styles.summaryValue}>{money(total)}</Text>
+            </View>
             <View style={styles.total}>
               <Text style={styles.sectionTitle}>Total estimado</Text>
               <Text style={styles.totalMoney}>{money(total)}</Text>
             </View>
             <Text style={styles.summaryCopy}>
-              Confirmaremos existencias, envío y forma de pago por WhatsApp.
+              *Sin incluir envío. Confirmaremos existencias y pago por WhatsApp.
             </Text>
           </View>
-          <PrimaryButton title="Continuar por WhatsApp" onPress={checkout} />
+          <PrimaryButton title="Continuar pedido por WhatsApp" onPress={checkout} />
         </>
       )}
     </ScrollView>
@@ -487,7 +611,9 @@ function Profile({
     }
   };
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+      <Text style={styles.pageEyebrow}>MI ESPACIO</Text>
+      <Text style={styles.pageTitle}>Mi cuenta</Text>
       <View style={styles.profileHero}>
         <View style={styles.profileAvatar}>
           <Text style={styles.profileInitial}>
@@ -517,6 +643,13 @@ function Profile({
         <Text style={styles.productName}>{customer.email}</Text>
       </View>
       <PrimaryButton title="Guardar cambios" onPress={save} />
+      <View style={styles.supportCard}>
+        <MaterialCommunityIcons name="message-text-outline" size={22} color={colors.forest} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.supportTitle}>¿Necesitas ayuda?</Text>
+          <Text style={styles.supportCopy}>Nuestro equipo puede atenderte por WhatsApp.</Text>
+        </View>
+      </View>
       <Pressable
         style={styles.logout}
         onPress={() => supabase.auth.signOut({ scope: "local" })}
@@ -575,69 +708,90 @@ function BottomNav({
   );
 }
 
-function ProductCard({
+function ProductDetail({
   product,
+  onClose,
   onAdd,
 }: {
-  product: Product;
-  onAdd: () => void;
+  product: Product | null;
+  onClose: () => void;
+  onAdd: (product: Product) => void;
 }) {
   return (
-    <View style={styles.productCard}>
-      {product.image ? (
-        <Image source={{ uri: product.image }} style={styles.productImage} />
-      ) : (
-        <View style={[styles.productImage, styles.imageFallback]}>
-          <MaterialCommunityIcons
-            name="package-variant"
-            size={32}
-            color={colors.gold}
-          />
-        </View>
-      )}
-      <Text numberOfLines={1} style={styles.productName}>
-        {product.name}
-      </Text>
-      <Text style={styles.muted}>{product.category}</Text>
-      <View style={styles.priceRow}>
-        <Text style={styles.price}>{money(product.price)}</Text>
-        <Pressable
-          disabled={!product.stock}
-          onPress={onAdd}
-          style={[styles.add, !product.stock && { opacity: 0.35 }]}
-        >
-          <MaterialCommunityIcons name="plus" size={20} color={colors.cream} />
-        </Pressable>
-      </View>
-    </View>
+    <Modal
+      visible={Boolean(product)}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      {product ? (
+        <SafeAreaView style={styles.detailPage}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.detailImageWrap}>
+              {product.image ? (
+                <Image source={{ uri: product.image }} style={styles.detailImage} />
+              ) : (
+                <View style={[styles.detailImage, styles.imageFallback]}>
+                  <MaterialCommunityIcons name="package-variant" size={52} color={colors.gold} />
+                </View>
+              )}
+              <Pressable onPress={onClose} style={styles.detailClose}>
+                <MaterialCommunityIcons name="arrow-left" size={22} color={colors.ink} />
+              </Pressable>
+            </View>
+            <View style={styles.detailContent}>
+              <Text style={styles.detailCategory}>{product.category.toUpperCase()}</Text>
+              <Text style={styles.detailName}>{product.name}</Text>
+              <Text style={styles.detailPrice}>{money(product.price)}</Text>
+              <View style={styles.stockLine}>
+                <View style={[styles.stockDot, !product.stock && styles.stockDotEmpty]} />
+                <Text style={styles.stockText}>
+                  {product.stock ? `${product.stock} disponibles` : "Agotado por el momento"}
+                </Text>
+              </View>
+              <Text style={styles.detailCopy}>
+                Una pieza seleccionada por L'Art de la Vie. Confirma los detalles,
+                disponibilidad y envío con nuestro equipo al preparar tu pedido.
+              </Text>
+              <View style={styles.detailBenefit}>
+                <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.forest} />
+                <Text style={styles.detailBenefitText}>Envíos coordinados a toda Honduras</Text>
+              </View>
+            </View>
+          </ScrollView>
+          <View style={styles.detailFooter}>
+            <Pressable
+              disabled={!product.stock}
+              onPress={() => onAdd(product)}
+              style={[styles.detailButton, !product.stock && styles.detailButtonDisabled]}
+            >
+              <MaterialCommunityIcons name="shopping-outline" size={20} color={colors.cream} />
+              <Text style={styles.detailButtonText}>
+                {product.stock ? "Agregar a mi bolsa" : "Producto agotado"}
+              </Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      ) : null}
+    </Modal>
   );
 }
-function MiniProduct({ product }: { product: Product }) {
-  return (
-    <View style={styles.miniProduct}>
-      {product.image ? (
-        <Image source={{ uri: product.image }} style={styles.miniImage} />
-      ) : (
-        <View style={[styles.miniImage, styles.imageFallback]} />
-      )}
-      <Text numberOfLines={1} style={styles.miniName}>
-        {product.name}
-      </Text>
-    </View>
-  );
-}
+
 function Input(
-  props: React.ComponentProps<typeof TextInput> & { label: string },
+  props: React.ComponentProps<typeof TextInput> & { label: string; trailing?: React.ReactNode },
 ) {
-  const { label, ...input } = props;
+  const { label, trailing, ...input } = props;
   return (
     <View style={{ gap: 7 }}>
       <Text style={styles.label}>{label.toUpperCase()}</Text>
-      <TextInput
-        {...input}
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-      />
+      <View style={styles.inputWrap}>
+        <TextInput
+          {...input}
+          placeholderTextColor={colors.muted}
+          style={styles.input}
+        />
+        {trailing}
+      </View>
     </View>
   );
 }
@@ -692,293 +846,92 @@ function Loading() {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.cream },
   body: { flex: 1 },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 18,
-    backgroundColor: colors.forest,
-  },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18, backgroundColor: colors.forest },
   loadingLogo: { width: 120, height: 120, borderRadius: 60 },
-  auth: {
-    flex: 1,
-    backgroundColor: colors.forest,
-    justifyContent: "center",
-    padding: 22,
-    gap: 22,
-  },
+  auth: { flex: 1, backgroundColor: colors.cream, justifyContent: "center", padding: 16 },
+  authBackdrop: { position: "absolute", left: 0, right: 0, top: 0, width: "115%", height: 300, opacity: 0.76 },
+  authShade: { position: "absolute", left: 0, right: 0, top: 0, height: 310 },
   authBrand: { alignItems: "center" },
-  authLogo: { width: 86, height: 86, borderRadius: 43, marginBottom: 14 },
-  authEyebrow: {
-    color: colors.gold,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 3,
-  },
-  authTitle: {
-    color: colors.cream,
-    fontSize: 30,
-    fontWeight: "900",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  authCopy: {
-    color: "#D8E0DA",
-    textAlign: "center",
-    lineHeight: 21,
-    marginTop: 8,
-    maxWidth: 380,
-  },
-  authCard: {
-    backgroundColor: colors.paper,
-    borderRadius: 24,
-    padding: 22,
-    gap: 16,
-  },
-  cardTitle: { fontSize: 25, fontWeight: "900", color: colors.ink },
-  label: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    color: colors.forest2,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    paddingVertical: 13,
-    color: colors.ink,
-    backgroundColor: colors.cream,
-  },
-  primary: {
-    minHeight: 50,
-    borderRadius: 25,
-    backgroundColor: colors.forest,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-  },
+  authLogo: { width: 68, height: 68, borderRadius: 34, marginBottom: 5 },
+  authEyebrow: { color: colors.gold, fontSize: 9, fontWeight: "900", letterSpacing: 2.8 },
+  authCopy: { color: colors.muted, textAlign: "center", lineHeight: 19, marginTop: 5, maxWidth: 310, fontSize: 13 },
+  authCard: { marginTop: 92, backgroundColor: colors.paper, borderRadius: 28, padding: 22, gap: 14, borderWidth: 1, borderColor: colors.line, elevation: 8, shadowColor: colors.forest, shadowOpacity: 0.13, shadowRadius: 24, shadowOffset: { width: 0, height: 12 } },
+  confirmation: { alignItems: "center", gap: 13, paddingVertical: 8 },
+  confirmationIcon: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "#EAF2ED" },
+  confirmationCopy: { color: colors.muted, textAlign: "center", fontSize: 13, lineHeight: 20 },
+  confirmationHint: { color: colors.forest, textAlign: "center", fontSize: 11, fontWeight: "700", marginBottom: 3 },
+  cardTitle: { fontFamily: "serif", fontSize: 27, fontWeight: "700", color: colors.forest, marginTop: 3 },
+  label: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, color: colors.muted },
+  inputWrap: { minHeight: 49, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: 17, paddingHorizontal: 14, backgroundColor: colors.cream },
+  input: { flex: 1, color: colors.ink, paddingVertical: 12, paddingRight: 8 },
+  primary: { minHeight: 50, borderRadius: 25, backgroundColor: colors.forest, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 20 },
   primaryText: { color: colors.cream, fontWeight: "800" },
-  link: {
-    textAlign: "center",
-    color: colors.forest,
-    fontWeight: "700",
-    padding: 6,
-  },
-  header: {
-    height: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    gap: 11,
-    backgroundColor: colors.cream,
-  },
-  logo: { width: 42, height: 42, borderRadius: 21 },
-  brand: { fontWeight: "900", color: colors.ink, fontSize: 15 },
-  mini: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.forest,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { color: colors.gold, fontWeight: "900" },
-  page: { padding: 20, paddingBottom: 40, gap: 18 },
-  listPage: { flex: 1, paddingHorizontal: 16, paddingTop: 18 },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 2.5,
-    color: colors.gold,
-  },
-  heroTitle: {
-    fontSize: 36,
-    lineHeight: 41,
-    fontWeight: "900",
-    color: colors.ink,
-  },
-  heroCopy: { fontSize: 15, lineHeight: 23, color: colors.muted },
-  pageTitle: {
-    fontSize: 30,
-    fontWeight: "900",
-    color: colors.ink,
-    marginBottom: 8,
-  },
-  sectionTitle: { fontSize: 20, fontWeight: "900", color: colors.ink },
-  featured: { flexDirection: "row", gap: 10 },
-  miniProduct: { width: 100 },
-  miniImage: {
-    width: 100,
-    height: 120,
-    borderRadius: 14,
-    backgroundColor: "#EDF0ED",
-  },
-  miniName: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.ink,
-    marginTop: 7,
-  },
-  shipping: {
-    flexDirection: "row",
-    gap: 14,
-    alignItems: "center",
-    backgroundColor: colors.forest,
-    borderRadius: 20,
-    padding: 18,
-  },
-  shippingTitle: { color: colors.cream, fontWeight: "900", fontSize: 16 },
-  shippingCopy: { color: "#CFD9D2", fontSize: 12, marginTop: 3 },
-  search: {
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 16,
-    padding: 13,
-    backgroundColor: colors.paper,
-    marginBottom: 15,
-  },
-  columns: { gap: 12 },
-  productCard: {
-    flex: 1,
-    backgroundColor: colors.paper,
-    borderRadius: 18,
-    padding: 10,
-    marginBottom: 12,
-  },
-  productImage: {
-    width: "100%",
-    aspectRatio: 0.82,
-    borderRadius: 13,
-    marginBottom: 10,
-  },
-  imageFallback: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#EDF0ED",
-  },
-  productName: { fontWeight: "800", color: colors.ink },
+  resetLink: { textAlign: "center", color: colors.forest, textDecorationLine: "underline", fontSize: 12, paddingTop: 2 },
+  link: { textAlign: "center", color: colors.forest, fontWeight: "700", fontSize: 13, padding: 5 },
+  header: { height: 69, flexDirection: "row", alignItems: "center", paddingHorizontal: 18, gap: 10, backgroundColor: colors.cream },
+  logo: { width: 38, height: 38, borderRadius: 19 },
+  brandEyebrow: { fontSize: 8, letterSpacing: 1.8, color: colors.muted, fontWeight: "800" },
+  brand: { fontFamily: "serif", fontWeight: "700", color: colors.forest, fontSize: 17, lineHeight: 19 },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.cream, fontFamily: "serif", fontWeight: "700", fontSize: 17 },
+  page: { padding: 18, paddingBottom: 112, gap: 15 },
+  pageEyebrow: { color: colors.gold, fontSize: 9, fontWeight: "900", letterSpacing: 2 },
+  pageTitle: { fontFamily: "serif", fontSize: 30, lineHeight: 34, fontWeight: "700", color: colors.forest, marginTop: -8, marginBottom: 5 },
+  sectionTitle: { fontFamily: "serif", fontSize: 20, fontWeight: "700", color: colors.ink },
+  imageFallback: { alignItems: "center", justifyContent: "center", backgroundColor: "#EDF0ED" },
+  productName: { fontFamily: "serif", fontSize: 15, lineHeight: 18, fontWeight: "700", color: colors.ink },
   muted: { color: colors.muted, fontSize: 12, marginTop: 3 },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  price: { fontWeight: "900", color: colors.forest },
-  add: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.forest,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cartRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.paper,
-    padding: 15,
-    borderRadius: 16,
-  },
-  cartImage: {
-    width: 58,
-    height: 68,
-    borderRadius: 12,
-    backgroundColor: "#EDF0ED",
-  },
-  qty: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.cream,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  qtyText: { fontWeight: "900" },
-  total: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 12,
-  },
-  orderSummary: {
-    backgroundColor: colors.paper,
-    borderRadius: 20,
-    padding: 18,
-    gap: 9,
-  },
-  summaryCopy: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  totalMoney: { fontSize: 24, fontWeight: "900", color: colors.forest },
-  emailBox: {
-    backgroundColor: colors.paper,
-    borderRadius: 16,
-    padding: 15,
-    gap: 6,
-  },
-  profileHero: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-    backgroundColor: colors.forest,
-    borderRadius: 24,
-    padding: 18,
-  },
-  profileAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.gold,
-  },
-  profileInitial: { color: colors.forest, fontSize: 22, fontWeight: "900" },
-  profileName: { color: colors.cream, fontSize: 17, fontWeight: "900" },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.paper, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.line },
+  cartImage: { width: 78, height: 88, borderRadius: 14, backgroundColor: "#EDF0ED" },
+  cartInfo: { flex: 1, alignSelf: "stretch", justifyContent: "space-between", paddingVertical: 2 },
+  quantityRow: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", borderWidth: 1, borderColor: colors.line, borderRadius: 18 },
+  qty: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  qtyText: { minWidth: 22, textAlign: "center", fontWeight: "800", color: colors.ink },
+  remove: { alignSelf: "flex-end", width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  deliveryNote: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 15, borderRadius: 18, backgroundColor: "#F2EFE6" },
+  deliveryText: { flex: 1, color: colors.muted, fontSize: 12, lineHeight: 17 },
+  orderSummary: { backgroundColor: colors.paper, borderRadius: 22, padding: 18, gap: 9, borderWidth: 1, borderColor: colors.line },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  summaryCopy: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  summaryValue: { color: colors.ink, fontWeight: "700", fontSize: 13 },
+  total: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 5 },
+  totalMoney: { fontFamily: "serif", fontSize: 23, fontWeight: "700", color: colors.forest },
+  emailBox: { backgroundColor: colors.paper, borderRadius: 17, padding: 15, gap: 6, borderWidth: 1, borderColor: colors.line },
+  profileHero: { flexDirection: "row", alignItems: "center", gap: 13, backgroundColor: colors.forest, borderRadius: 24, padding: 18 },
+  profileAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", backgroundColor: colors.gold },
+  profileInitial: { color: colors.forest, fontFamily: "serif", fontSize: 23, fontWeight: "700" },
+  profileName: { color: colors.cream, fontFamily: "serif", fontSize: 18, fontWeight: "700" },
   profileEmail: { color: "#C9D6CD", fontSize: 11, marginTop: 3 },
+  supportCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, backgroundColor: "#F2EFE6", borderRadius: 18 },
+  supportTitle: { color: colors.ink, fontWeight: "800", fontSize: 13 },
+  supportCopy: { color: colors.muted, fontSize: 11, marginTop: 2 },
   logout: { padding: 15, alignItems: "center" },
   logoutText: { color: colors.danger, fontWeight: "800" },
-  empty: {
-    minHeight: 260,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-    backgroundColor: colors.paper,
-    borderRadius: 20,
-  },
-  nav: {
-    height: 78,
-    flexDirection: "row",
-    backgroundColor: colors.paper,
-    borderTopWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    borderRadius: 18,
-  },
-  navItemActive: { backgroundColor: "#EDF3EF" },
-  navText: { fontSize: 10, color: colors.muted, fontWeight: "700" },
+  empty: { minHeight: 260, alignItems: "center", justifyContent: "center", gap: 14, backgroundColor: colors.paper, borderRadius: 22, borderWidth: 1, borderColor: colors.line },
+  nav: { position: "absolute", left: 12, right: 12, bottom: 10, height: 74, flexDirection: "row", backgroundColor: "rgba(255,255,255,.98)", borderWidth: 1, borderColor: colors.line, borderRadius: 37, paddingHorizontal: 7, paddingVertical: 6, elevation: 12, shadowColor: colors.forest, shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 7 } },
+  navItem: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2, borderRadius: 27 },
+  navItemActive: { backgroundColor: "#EAF2ED" },
+  navText: { fontSize: 9, color: colors.muted, fontWeight: "700" },
   navActive: { color: colors.forest },
-  badge: {
-    position: "absolute",
-    right: -9,
-    top: -6,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    backgroundColor: colors.gold,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  badge: { position: "absolute", right: -9, top: -6, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center" },
   badgeText: { fontSize: 9, fontWeight: "900", color: colors.forest },
+  detailPage: { flex: 1, backgroundColor: colors.cream },
+  detailImageWrap: { height: 460, backgroundColor: "#EDF0ED" },
+  detailImage: { width: "100%", height: "100%" },
+  detailClose: { position: "absolute", top: 16, left: 16, width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(250,248,242,.94)" },
+  detailContent: { padding: 22, gap: 10 },
+  detailCategory: { color: colors.gold, fontSize: 10, fontWeight: "900", letterSpacing: 1.8 },
+  detailName: { color: colors.forest, fontFamily: "serif", fontSize: 31, lineHeight: 35, fontWeight: "700" },
+  detailPrice: { color: colors.forest, fontFamily: "serif", fontSize: 23, fontWeight: "700" },
+  stockLine: { flexDirection: "row", alignItems: "center", gap: 7 },
+  stockDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.forest2 },
+  stockDotEmpty: { backgroundColor: colors.danger },
+  stockText: { color: colors.muted, fontSize: 12 },
+  detailCopy: { color: colors.muted, fontSize: 13, lineHeight: 20, marginTop: 5 },
+  detailBenefit: { flexDirection: "row", alignItems: "center", gap: 11, borderRadius: 18, backgroundColor: "#F2EFE6", padding: 15, marginTop: 7 },
+  detailBenefitText: { color: colors.ink, fontSize: 12, fontWeight: "700" },
+  detailFooter: { padding: 16, backgroundColor: colors.paper, borderTopWidth: 1, borderColor: colors.line },
+  detailButton: { minHeight: 52, borderRadius: 26, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: colors.forest },
+  detailButtonDisabled: { opacity: 0.45 },
+  detailButtonText: { color: colors.cream, fontWeight: "800" },
 });

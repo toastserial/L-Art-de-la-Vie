@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f2efe6;font-family:Arial,Helvetica,sans-serif;color:#17201b;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2efe6;">
+      <tr>
+        <td align="center" style="padding:32px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e8e5;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td align="center" style="background:#073b20;padding:34px 24px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="width:64px;height:64px;border-radius:32px;background:#c3a447;color:#073b20;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;">L'Art</td>
+                  </tr>
+                </table>
+                <p style="margin:18px 0 5px;color:#c3a447;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;">Boutique</p>
+                <h1 style="margin:0;color:#faf8f2;font-family:Georgia,'Times New Roman',serif;font-size:31px;line-height:38px;font-weight:normal;">Confirma tu cuenta</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 34px 30px;">
+                <p style="margin:0 0 16px;font-size:16px;line-height:25px;">¡Hola!</p>
+                <p style="margin:0 0 24px;color:#68736c;font-size:15px;line-height:24px;">
+                  Gracias por crear tu cuenta en L'Art de la Vie. Confirma tu correo para descubrir nuestra colección y preparar tus pedidos desde la aplicación.
+                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="padding:4px 0 28px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#073b20;color:#faf8f2;text-decoration:none;font-size:15px;font-weight:bold;padding:16px 28px;border-radius:28px;">Confirmar mi correo</a>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#faf8f2;border-radius:16px;">
+                  <tr>
+                    <td style="padding:17px 18px;color:#68736c;font-size:12px;line-height:19px;">
+                      Este enlace es personal. Si tú no creaste esta cuenta, puedes ignorar el mensaje con tranquilidad.
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:24px 0 7px;color:#68736c;font-size:11px;line-height:17px;">Si el botón no funciona, copia y abre este enlace:</p>
+                <p style="margin:0;word-break:break-all;font-size:11px;line-height:17px;"><a href="{{ .ConfirmationURL }}" style="color:#155c36;">{{ .ConfirmationURL }}</a></p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="border-top:1px solid #e5e8e5;padding:22px 24px;color:#68736c;font-size:11px;line-height:18px;">
+                L'Art de la Vie · Siguatepeque, Honduras<br />Detalles que hacen de la vida un arte.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

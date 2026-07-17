@@ -15,3 +15,6 @@ backend/dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Referencia visual clonada desde Lovable; no forma parte del monorepo.
+/boutique/

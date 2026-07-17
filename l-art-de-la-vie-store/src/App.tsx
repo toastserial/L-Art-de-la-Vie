@@ -9,8 +9,13 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { TopBar } from "@/components/layout/TopBar";
 import { WhatsAppButton } from "@/components/shared/WhatsAppButton";
+import { AuthConfirmedPage } from "@/components/auth/AuthConfirmedPage";
 
 export default function App() {
+  if (window.location.pathname === "/auth/confirmed") {
+    return <AuthConfirmedPage />;
+  }
+
   return (
     <div className="min-h-dvh bg-[color:var(--paper)]">
       <TopBar />
