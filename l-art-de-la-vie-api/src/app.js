@@ -13,7 +13,6 @@ import { storeId, supabase, unwrap } from "./supabase.js";
 import { httpError, integer, number, optionalText, text, uuid } from "./validation.js";
 import { requireAuth, requireRole, requireUserAuth } from "./auth.js";
 
-const categories = ["Decoración", "Perfumes", "Carteras", "Varios"];
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
 const openApiDocument = YAML.parse(readFileSync(new URL("../docs/openapi.yaml", import.meta.url), "utf8"));
 const imageBaseUrl = `${(process.env.SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/product-images/${storeId}/`;
@@ -46,12 +45,17 @@ const productImage = (value) => {
 };
 const productValues = (body) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw httpError(400, "Datos de producto inválidos");
-  if (!categories.includes(body.category)) throw httpError(400, "Categoría inválida");
   return {
-    name: text(body.name, "Nombre", 160), category: body.category,
+    name: text(body.name, "Nombre", 160), category: text(body.category, "Categoría", 60),
     price: number(body.price, "Precio", 0, 100_000_000), stock: integer(body.stock, "Stock"),
     min_stock: integer(body.minStock, "Stock mínimo"), image_url: productImage(body.image)
   };
+};
+const categoryName = (value) => text(value, "Categoría", 60).replace(/\s+/g, " ");
+const ensureCategory = async (name) => {
+  const category = unwrap(await supabase.from("product_categories")
+    .select("name").eq("store_id", storeId).eq("name", name).eq("active", true).maybeSingle());
+  if (!category) throw httpError(400, "La categoría seleccionada no existe");
 };
 const saleItems = (value) => {
   if (!Array.isArray(value) || value.length === 0) throw httpError(400, "El carrito está vacío");
@@ -172,15 +176,18 @@ export function createApp() {
   }));
 
   app.get("/api/catalog", asyncRoute(async (_req, res) => {
-    const products = unwrap(await supabase
+    const [productResult, categoryResult] = await Promise.all([supabase
       .from("products")
       .select("id,name,category,price,stock,image_url")
       .eq("store_id", storeId)
       .eq("active", true)
       .order("name")
-      .limit(500));
+      .limit(500), supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name")]);
+    const products = unwrap(productResult);
+    const categories = unwrap(categoryResult).map((category) => category.name);
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     res.json({
+      categories,
       products: products.map((product) => ({
         id: product.id,
         name: product.name,
@@ -228,12 +235,13 @@ export function createApp() {
       supabase.from("stores").select("timezone").eq("id", storeId).single(),
       supabase.from("cash_openings").select("id,business_date,opening_cash,note,created_at").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
       supabase.from("products").select("id,code,name,category,price,stock,min_stock,image_url").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
+      supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name"),
       supabase.from("sales").select("id,folio,created_at,subtotal,discount,total,payment_method,cash_received,change_amount,sale_items(product_id,product_name,quantity,unit_price,subtotal)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
       supabase.from("inventory_movements").select("id,product_id,product_name,type,quantity,note,created_at").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
       supabase.from("cash_closes").select("id,business_date,opening_cash,total_sales,cash_sales,card_sales,transfer_sales,total_expenses,expected_cash,actual_cash,difference,created_at,cash_close_expenses(expenses(id,description,amount,created_at))").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
       supabase.from("expenses").select("id,description,amount,created_at,cash_close_expenses(expense_id)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500)
     ]);
-    const [store, openings, products, sales, movements, closes, expenses] = results.map(unwrap);
+    const [store, openings, products, categories, sales, movements, closes, expenses] = results.map(unwrap);
     const currentDate = dateInTimezone(new Date(), store.timezone);
     const todayOpening = openings.find((opening) => opening.business_date === currentDate);
     const todayClose = closes.find((close) => close.business_date === currentDate);
@@ -241,7 +249,7 @@ export function createApp() {
       expense.cash_close_expenses.length === 0 && dateInTimezone(expense.created_at, store.timezone) === currentDate
     );
     res.json({
-      products: products.map(productFromDb), sales: sales.map(saleFromDb),
+      products: products.map(productFromDb), categories: categories.map((category) => category.name), sales: sales.map(saleFromDb),
       movements: movements.map(movementFromDb), cashCloses: closes.map(closeFromDb),
       todayExpenses: openExpenses.map(expenseFromDb),
       cashOpening: todayOpening ? openingFromDb(todayOpening) : todayClose ? {
@@ -266,6 +274,7 @@ export function createApp() {
 
   app.post("/api/products", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     const values = { store_id: storeId, ...productValues(req.body) };
+    await ensureCategory(values.category);
     res.status(201).json(productFromDb(unwrap(await supabase.from("products").insert(values).select().single())));
   }));
 
@@ -285,8 +294,27 @@ export function createApp() {
 
   app.put("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     const productId = uuid(req.params.id, "Producto");
-    const result = await supabase.from("products").update(productValues(req.body)).eq("store_id", storeId).eq("id", productId).select().single();
+    const values = productValues(req.body);
+    await ensureCategory(values.category);
+    const result = await supabase.from("products").update(values).eq("store_id", storeId).eq("id", productId).select().single();
     res.json(productFromDb(unwrap(result)));
+  }));
+
+  app.post("/api/categories", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
+    const name = categoryName(req.body?.name);
+    const existingCategories = unwrap(await supabase.from("product_categories")
+      .select("id,name,active").eq("store_id", storeId).limit(500));
+    const existing = existingCategories.find((category) =>
+      category.name.localeCompare(name, "es", { sensitivity: "base" }) === 0
+    );
+    if (existing?.active) throw httpError(409, "Esta categoría ya existe");
+    if (existing) {
+      const restored = unwrap(await supabase.from("product_categories").update({ active: true, name })
+        .eq("id", existing.id).select("name").single());
+      return res.status(201).json(restored);
+    }
+    const created = unwrap(await supabase.from("product_categories").insert({ store_id: storeId, name }).select("name").single());
+    res.status(201).json(created);
   }));
 
   app.delete("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {

@@ -6,14 +6,14 @@ export interface FilterState {
   category: Category | "Todo";
 }
 
-const CATS: (Category | "Todo")[] = ["Todo", "Decoración", "Perfumes", "Carteras", "Varios"];
-
 export function ProductFilters({
   value,
   onChange,
+  categories,
 }: {
   value: FilterState;
   onChange: (v: FilterState) => void;
+  categories: Category[];
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -33,7 +33,7 @@ export function ProductFilters({
         aria-label="Filtrar por categoría"
         className="hide-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1"
       >
-        {CATS.map((c) => {
+        {["Todo", ...categories].map((c) => {
           const active = value.category === c;
           return (
             <button

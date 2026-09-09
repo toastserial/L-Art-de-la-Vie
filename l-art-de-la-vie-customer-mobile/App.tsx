@@ -319,12 +319,12 @@ function AuthScreen() {
         });
         if (error) throw error;
       }
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      console.error("[customer-signup]", message);
       Alert.alert(
         "No fue posible continuar",
-        register
-          ? "Revisa el correo o intenta nuevamente."
-          : "Correo o contraseña incorrectos.",
+        humanizeAuthError(message, register),
       );
     } finally {
       setBusy(false);
@@ -453,6 +453,34 @@ function AuthScreen() {
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+function humanizeAuthError(message: string, registering: boolean) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("already registered") || normalized.includes("already exists")) {
+    return "Este correo ya tiene una cuenta. Regresa e inicia sesión.";
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many")) {
+    return "Se hicieron demasiados intentos. Espera unos minutos antes de reenviar el correo.";
+  }
+  if (normalized.includes("invalid email")) {
+    return "El correo no parece válido. Revísalo e intenta nuevamente.";
+  }
+  if (normalized.includes("signup") && normalized.includes("disabled")) {
+    return "El registro de usuarios está desactivado en Supabase.";
+  }
+  if (
+    normalized.includes("sending confirmation") ||
+    normalized.includes("email") && (normalized.includes("send") || normalized.includes("smtp"))
+  ) {
+    return "Supabase no pudo enviar el correo. Revisa el SMTP de Brevo, especialmente usuario, SMTP Key y remitente verificado.";
+  }
+  if (!registering && (normalized.includes("invalid login") || normalized.includes("credentials"))) {
+    return "Correo o contraseña incorrectos.";
+  }
+  return registering
+    ? `Supabase respondió: ${message}`
+    : "Correo o contraseña incorrectos.";
 }
 
 function Header({ customer, onProfile }: { customer: Customer; onProfile: () => void }) {

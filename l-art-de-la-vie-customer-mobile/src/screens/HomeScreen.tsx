@@ -12,7 +12,7 @@ import {
 import { colors, money } from "../theme";
 import type { Customer, Product } from "../types";
 
-const CATEGORY_ORDER = ["Decoración", "Perfumes", "Carteras", "Varios"];
+const FEATURED_CATEGORY_ORDER = ["Decoración", "Perfumes", "Carteras", "Varios"];
 
 export function HomeScreen({
   customer,
@@ -27,7 +27,18 @@ export function HomeScreen({
 }) {
   const available = products.filter((product) => product.stock > 0);
   const featured = available.slice(0, 6);
-  const categories = CATEGORY_ORDER.map((name) => ({
+  const categoryNames = [...new Set(products.map((product) => product.category))]
+    .sort((left, right) => {
+      const leftIndex = FEATURED_CATEGORY_ORDER.indexOf(left);
+      const rightIndex = FEATURED_CATEGORY_ORDER.indexOf(right);
+      if (leftIndex >= 0 || rightIndex >= 0) {
+        if (leftIndex < 0) return 1;
+        if (rightIndex < 0) return -1;
+        return leftIndex - rightIndex;
+      }
+      return left.localeCompare(right, "es");
+    });
+  const categories = categoryNames.map((name) => ({
     name,
     sample: products.find((product) => product.category === name),
   }));

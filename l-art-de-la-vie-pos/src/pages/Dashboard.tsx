@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ["hsl(127,100%,12%)", "hsl(49,55%,52%)", "hsl(127,60%,30%)", "hsl(49,40%,40%)"];
 
 export default function Dashboard() {
-  const { products, sales } = useStore();
+  const { products, categories, sales } = useStore();
 
   const today = new Date().toISOString().split("T")[0];
   const todaySales = sales.filter((s) => s.date.startsWith(today));
@@ -22,7 +22,7 @@ export default function Dashboard() {
   const lowStock = products.filter((p) => p.stock <= p.minStock);
 
   // Sales by category
-  const categoryData = ["Decoración", "Perfumes", "Carteras", "Varios"].map((cat) => {
+  const categoryData = categories.map((cat) => {
     const catProducts = products.filter((p) => p.category === cat);
     return { name: cat, stock: catProducts.reduce((s, p) => s + p.stock, 0) };
   });

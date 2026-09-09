@@ -11,15 +11,15 @@ import { uploadProductImage } from "../lib/api";
 import { colors, money, shortDate } from "../theme";
 import type { Category, Product } from "../types";
 import { ImageCropper, type CropSource, type CroppedImage } from "../components/ImageCropper";
+import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
 
-const categoryOptions: { value: Category; label: string }[] = ["Decoración", "Perfumes", "Carteras", "Varios"].map(value => ({ value: value as Category, label: value }));
 interface ProductForm { name: string; category: Category; price: string; stock: string; minStock: string; image?: string }
 interface PendingImage { uri: string; width: number; height: number; mimeType?: string | null; fileName?: string | null }
 const blank: ProductForm = { name: "", category: "Decoración", price: "", stock: "", minStock: "3" };
 
 export function InventoryScreen() {
   const { canManage } = useAuth();
-  const { products, movements, refreshing, refresh, addProduct, updateProduct, deleteProduct, addMovement } = useStore();
+  const { products, categories, movements, refreshing, refresh, addProduct, updateProduct, deleteProduct, addMovement, addCategory } = useStore();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"products" | "movements">("products");
   const [productOpen, setProductOpen] = useState(false);
@@ -34,9 +34,17 @@ export function InventoryScreen() {
   const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
 
   const filtered = useMemo(() => products.filter(product => `${product.name} ${product.code} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
-  const openNew = () => { setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm(blank); setProductOpen(true); };
+  const categoryOptions = useMemo(() => categories.map(value => ({ value, label: value })), [categories]);
+  const openNew = () => {
+    const firstCategory = categories[0];
+    if (!firstCategory) { setCategoryOpen(true); return; }
+    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
+  };
   const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ name: product.name, category: product.category, price: String(product.price), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
@@ -118,17 +126,26 @@ export function InventoryScreen() {
     catch (reason) { Alert.alert("No se registró", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
     finally { setBusy(false); }
   };
+  const saveCategory = async () => {
+    const name = newCategory.trim();
+    if (!name) return Alert.alert("Falta el nombre", "Escribe un nombre para la categoría.");
+    setBusy(true);
+    try { await addCategory(name); setForm(current => ({ ...current, category: name })); setNewCategory(""); setCategoryOpen(false); }
+    catch (reason) { Alert.alert("No se agregó", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
+    finally { setBusy(false); }
+  };
 
   return <>
     <Page title="Inventario" subtitle={`${products.length} productos registrados`} refreshing={refreshing} onRefresh={() => refresh(true)}
       action={canManage ? <Pressable onPress={openNew} style={styles.addButton}><MaterialCommunityIcons name="plus" size={26} color={colors.white} /></Pressable> : undefined}>
       <Segmented<"products" | "movements"> values={[{ value: "products", label: "Productos" }, { value: "movements", label: "Movimientos" }]} value={tab} onChange={setTab} />
       {tab === "products" ? <>
+        {canManage && <Button title="Nueva categoría" icon="folder-plus-outline" variant="ghost" compact onPress={() => setCategoryOpen(true)} style={styles.categoryButton} />}
         <View style={styles.search}><Field value={search} onChangeText={setSearch} placeholder="Buscar producto..." /></View>
         <Card style={styles.list}>
           {filtered.length === 0 ? <EmptyState icon="package-variant" title="Sin productos" message="No encontramos productos con esa búsqueda." /> : filtered.map((product, index) => {
             const low = product.stock <= product.minStock;
-            return <Pressable key={product.id} onPress={() => canManage && openEdit(product)} style={[styles.row, index > 0 && styles.border]}>
+            return <Pressable key={product.id} onPress={() => setPreviewProduct(product)} style={[styles.row, index > 0 && styles.border]}>
               {product.image ? <Image source={{ uri: product.image }} style={styles.productThumb} /> : <View style={styles.initial}><Text style={styles.initialText}>{product.name.charAt(0)}</Text></View>}
               <View style={styles.details}><Text style={styles.name}>{product.name}</Text><Text style={styles.meta}>{product.code} · {product.category}</Text><Text style={styles.price}>{money(product.price)}</Text></View>
               <View style={styles.rowRight}><Pill tone={low ? "danger" : "success"}>{product.stock} uds.</Pill>{canManage && <Pressable onPress={() => openMovement(product)} hitSlop={10} style={styles.moveButton}><MaterialCommunityIcons name="swap-vertical" size={20} color={colors.forest} /></Pressable>}</View>
@@ -174,12 +191,23 @@ export function InventoryScreen() {
       <View style={styles.fieldSpacer} /><Field label="Cantidad" value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />
       <Field label="Motivo o nota" value={note} onChangeText={setNote} placeholder="Ej. compra a proveedor" multiline />
     </Sheet>
+    <ProductPreviewSheet
+      product={previewProduct}
+      onClose={() => setPreviewProduct(null)}
+      primaryLabel={canManage ? "Editar producto" : undefined}
+      onPrimary={canManage ? (product) => { setPreviewProduct(null); openEdit(product); } : undefined}
+    />
+    <Sheet visible={categoryOpen} onClose={() => setCategoryOpen(false)} title="Nueva categoría" footer={<Button title="Agregar categoría" icon="check" onPress={saveCategory} loading={busy} />}>
+      <Field label="Nombre" value={newCategory} onChangeText={setNewCategory} placeholder="Ej. Joyería" maxLength={60} />
+      <Text style={styles.categoryHelp}>Se sincronizará con inventario, punto de venta, tienda web y app de clientes.</Text>
+    </Sheet>
     <ImageCropper source={cropSource} onCancel={() => setCropSource(null)} onConfirm={useCroppedImage} />
   </>;
 }
 
 const styles = StyleSheet.create({
   addButton: { width: 47, height: 47, borderRadius: 16, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" }, search: { marginTop: 16 }, list: { padding: 4 }, movements: { marginTop: 16 },
+  categoryButton: { alignSelf: "flex-start", marginTop: 10 }, categoryHelp: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 10 },
   row: { minHeight: 84, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 10 }, border: { borderTopWidth: 1, borderTopColor: colors.line },
   initial: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, outIcon: { backgroundColor: colors.dangerSoft }, initialText: { color: colors.forest, fontSize: 18, fontWeight: "900" },
   productThumb: { width: 48, height: 48, borderRadius: 15, backgroundColor: colors.forestSoft },

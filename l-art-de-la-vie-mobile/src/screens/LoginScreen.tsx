@@ -37,7 +37,7 @@ export function LoginScreen() {
         <Text style={styles.brandSub}>Punto de venta móvil</Text>
       </View>
       <View style={styles.panel}>
-        <Text style={styles.title}>Bienvenida</Text>
+        <Text style={styles.title}>Bienvenido</Text>
         <Text style={styles.copy}>Ingresa para administrar la tienda desde tu teléfono.</Text>
         {supabaseConfigError && <View style={styles.warning}><Text style={styles.warningText}>{supabaseConfigError}</Text></View>}
         <Field label="Correo electrónico" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="correo@ejemplo.com" />

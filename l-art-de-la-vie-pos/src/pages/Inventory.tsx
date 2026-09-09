@@ -11,18 +11,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Search, ArrowUpDown, ImagePlus, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, ImagePlus, X, Eye, FolderPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { uploadProductImage } from "@/lib/api";
-
-const categories: Category[] = ["Decoración", "Perfumes", "Carteras", "Varios"];
+import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
 
 type ProductForm = Omit<Product, "id" | "code">;
 const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, stock: 0, minStock: 3 };
 
 export default function Inventory() {
-  const { products, movements, addProduct, updateProduct, deleteProduct, addMovement } = useStore();
+  const { products, categories, movements, addProduct, updateProduct, deleteProduct, addMovement, addCategory } = useStore();
   const { toast } = useToast();
   const { canManage } = useAuth();
   const [search, setSearch] = useState("");
@@ -33,6 +32,9 @@ export default function Inventory() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
+  const [categoryDialog, setCategoryDialog] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
   const [movementDialog, setMovementDialog] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -45,7 +47,11 @@ export default function Inventory() {
     return matchSearch && matchCat;
   });
 
-  const openAdd = () => { setEditingProduct(null); setImageFile(null); setImagePreview(undefined); setForm(emptyProduct); setDialogOpen(true); };
+  const openAdd = () => {
+    if (categories.length === 0) { setCategoryDialog(true); return; }
+    setEditingProduct(null); setImageFile(null); setImagePreview(undefined);
+    setForm({ ...emptyProduct, category: categories[0] }); setDialogOpen(true);
+  };
   const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, stock: p.stock, minStock: p.minStock, image: p.image }); setDialogOpen(true); };
 
   const handleImage = (file?: File) => {
@@ -96,12 +102,24 @@ export default function Inventory() {
       toast({ title: "No se pudo registrar", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
     }
   };
+  const handleAddCategory = async () => {
+    const name = newCategory.trim();
+    if (!name) return toast({ title: "Escribe el nombre de la categoría", variant: "destructive" });
+    try {
+      await addCategory(name);
+      setNewCategory(""); setCategoryDialog(false);
+      setForm((current) => ({ ...current, category: name }));
+      toast({ title: "Categoría agregada", description: name });
+    } catch (error) {
+      toast({ title: "No se pudo agregar", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-3xl font-display font-bold">Inventario</h1>
-        {canManage && <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" />Agregar Producto</Button>}
+        {canManage && <div className="flex gap-2"><Button variant="outline" onClick={() => setCategoryDialog(true)}><FolderPlus className="h-4 w-4 mr-2" />Nueva categoría</Button><Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" />Agregar Producto</Button></div>}
       </div>
 
       <Tabs defaultValue="products">
@@ -145,7 +163,7 @@ export default function Inventory() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           {p.image ? <img src={p.image} alt={p.name} className="h-11 w-11 rounded-xl object-cover border" /> : <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center font-bold text-primary">{p.name.charAt(0)}</div>}
-                          <span className="font-medium">{p.name}</span>
+                          <button type="button" onClick={() => setPreviewProduct(p)} className="font-medium text-left hover:text-primary hover:underline underline-offset-4">{p.name}</button>
                         </div>
                       </TableCell>
                       <TableCell><Badge variant="secondary">{p.category}</Badge></TableCell>
@@ -157,6 +175,9 @@ export default function Inventory() {
                       </TableCell>
                       <TableCell className="text-right">
                         {canManage ? <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setPreviewProduct(p)} title="Vista previa">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openMovement(p)} title="Movimiento">
                             <ArrowUpDown className="h-4 w-4" />
                           </Button>
@@ -266,6 +287,24 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? "Guardando..." : editingProduct ? "Guardar" : "Agregar"}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ProductPreviewDialog
+        product={previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
+        onEdit={canManage ? (product) => { setPreviewProduct(null); openEdit(product); } : undefined}
+      />
+
+      <Dialog open={categoryDialog} onOpenChange={setCategoryDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Nueva categoría</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-3">
+            <Label>Nombre</Label>
+            <Input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Ej. Joyería" maxLength={60} onKeyDown={(event) => event.key === "Enter" && handleAddCategory()} />
+            <p className="text-xs text-muted-foreground">Aparecerá automáticamente en inventario, venta, tienda web y app de clientes.</p>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setCategoryDialog(false)}>Cancelar</Button><Button onClick={handleAddCategory}>Agregar categoría</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

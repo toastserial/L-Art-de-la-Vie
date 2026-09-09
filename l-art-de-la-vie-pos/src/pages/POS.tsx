@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Search, Plus, Minus, Trash2, ShoppingBag, Printer } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingBag, Printer, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
 
 export default function POS() {
   const { products, cart, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
@@ -21,6 +22,7 @@ export default function POS() {
   const [cashReceived, setCashReceived] = useState(0);
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<import("@/types").Product | null>(null);
 
   const filteredProducts = products.filter(
     (p) => p.stock > 0 && (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
@@ -64,6 +66,7 @@ export default function POS() {
                   <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl bg-secondary">
                     {p.image ? <img src={p.image} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 hover:scale-105" /> : <div className="flex h-full items-center justify-center text-3xl font-display font-bold text-primary/50">{p.name.charAt(0)}</div>}
                     <Badge variant={p.stock <= p.minStock ? "destructive" : "secondary"} className="absolute right-2 top-2 text-xs shadow-sm">{p.stock}</Badge>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setPreviewProduct(p); }} className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:scale-105" aria-label={`Ver detalles de ${p.name}`}><Eye className="h-4 w-4" /></button>
                   </div>
                   <p className="font-medium text-sm truncate">{p.name}</p>
                   <p className="text-xs text-muted-foreground">{p.code}</p>
@@ -199,6 +202,11 @@ export default function POS() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ProductPreviewDialog
+        product={previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
+        onAdd={(product) => { addToCart(product); setPreviewProduct(null); }}
+      />
     </div>
   );
 }

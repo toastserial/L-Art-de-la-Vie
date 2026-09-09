@@ -4,6 +4,7 @@ import { Product, Sale, InventoryMovement, CartItem, CashClose, CashOpening, Exp
 
 interface StoreData {
   products: Product[];
+  categories: string[];
   sales: Sale[];
   movements: InventoryMovement[];
   cashCloses: CashClose[];
@@ -29,9 +30,15 @@ interface StoreContextType extends StoreData {
   addExpense: (expense: Omit<Expense, "id" | "date">) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   openCash: (openingCash: number, note?: string) => Promise<void>;
+  addCategory: (name: string) => Promise<void>;
 }
 
-const emptyStore: StoreData = { products: [], sales: [], movements: [], cashCloses: [], todayExpenses: [], cashOpening: null };
+const emptyStore: StoreData = { products: [], categories: [], sales: [], movements: [], cashCloses: [], todayExpenses: [], cashOpening: null };
+const normalizeStore = (data: StoreData) => ({
+  ...data,
+  categories: (Array.isArray(data.categories) ? data.categories : [...new Set(data.products.map((product) => product.category))])
+    .sort((left, right) => left.localeCompare(right, "es")),
+});
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider = ({ children }: { children: ReactNode }) => {
@@ -43,7 +50,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const refresh = useCallback(async () => {
     try {
       setError(null);
-      setStore(await api<StoreData>("/store"));
+      setStore(normalizeStore(await api<StoreData>("/store")));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo cargar la tienda");
       throw reason;
@@ -118,8 +125,12 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     const created = await api<CashOpening>("/cash-openings", { method: "POST", body: JSON.stringify({ openingCash, note }) });
     setStore((current) => ({ ...current, cashOpening: created }));
   };
+  const addCategory = async (name: string) => {
+    const created = await api<{ name: string }>("/categories", { method: "POST", body: JSON.stringify({ name }) });
+    setStore((current) => ({ ...current, categories: [...current.categories, created.name].sort((a, b) => a.localeCompare(b, "es")) }));
+  };
 
-  return <StoreContext.Provider value={{ ...store, cart, loading, error, refresh, addProduct, updateProduct, deleteProduct, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale, addMovement, closeCash, addExpense, deleteExpense, openCash }}>{children}</StoreContext.Provider>;
+  return <StoreContext.Provider value={{ ...store, cart, loading, error, refresh, addProduct, updateProduct, deleteProduct, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale, addMovement, closeCash, addExpense, deleteExpense, openCash, addCategory }}>{children}</StoreContext.Provider>;
 };
 
 export const useStore = () => {

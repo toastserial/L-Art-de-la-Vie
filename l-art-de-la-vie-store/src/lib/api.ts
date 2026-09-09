@@ -1,9 +1,8 @@
 import type { Product, Category } from "@/types/product";
-import { CATEGORIES } from "@/types/product";
 import { config } from "./config";
 
 function isValidCategory(x: unknown): x is Category {
-  return typeof x === "string" && (CATEGORIES as string[]).includes(x);
+  return typeof x === "string" && x.trim().length > 0 && x.length <= 60;
 }
 
 function normalize(raw: unknown): Product | null {

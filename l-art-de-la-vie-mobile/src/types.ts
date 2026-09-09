@@ -1,4 +1,4 @@
-export type Category = "Decoración" | "Perfumes" | "Carteras" | "Varios";
+export type Category = string;
 export type PaymentMethod = "efectivo" | "tarjeta" | "transferencia";
 export type StoreRole = "owner" | "admin" | "cashier";
 
@@ -11,4 +11,4 @@ export interface InventoryMovement { id: string; productId: string; productName:
 export interface Expense { id: string; description: string; amount: number; date: string }
 export interface CashOpening { id: string; date: string; openingCash: number; openedAt: string; note?: string }
 export interface CashClose { id: string; date: string; totalSales: number; salesByMethod: Record<PaymentMethod, number>; expectedCash: number; actualCash: number; difference: number; expenses: Expense[]; totalExpenses: number; openingCash: number }
-export interface StoreData { products: Product[]; sales: Sale[]; movements: InventoryMovement[]; cashCloses: CashClose[]; todayExpenses: Expense[]; cashOpening: CashOpening | null }
+export interface StoreData { products: Product[]; categories: string[]; sales: Sale[]; movements: InventoryMovement[]; cashCloses: CashClose[]; todayExpenses: Expense[]; cashOpening: CashOpening | null }

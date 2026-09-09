@@ -6,15 +6,12 @@ import { Page } from "../components/Page";
 import { useStore } from "../context/StoreContext";
 import { colors, money } from "../theme";
 import type { Category, PaymentMethod, Product } from "../types";
+import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
 
 type Filter = "Todas" | Category;
-const categories: { value: Filter; label: string }[] = [
-  { value: "Todas", label: "Todas" }, { value: "Decoración", label: "Decoración" },
-  { value: "Perfumes", label: "Perfumes" }, { value: "Carteras", label: "Carteras" }, { value: "Varios", label: "Varios" },
-];
 
 export function POSScreen() {
-  const { products, cart, cartCount, cartSubtotal, cashOpening, refreshing, refresh, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
+  const { products, categories, cart, cartCount, cartSubtotal, cashOpening, refreshing, refresh, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Filter>("Todas");
   const [cartOpen, setCartOpen] = useState(false);
@@ -22,6 +19,8 @@ export function POSScreen() {
   const [discount, setDiscount] = useState("0");
   const [cashReceived, setCashReceived] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
+  const categoryOptions = useMemo(() => [{ value: "Todas", label: "Todas" }, ...categories.map(value => ({ value, label: value }))] as { value: Filter; label: string }[], [categories]);
 
   const filtered = useMemo(() => products.filter(product => product.stock > 0
     && (category === "Todas" || product.category === category)
@@ -45,13 +44,13 @@ export function POSScreen() {
   };
 
   return <>
-    <Page title="Punto de venta" subtitle="Toca un producto para agregarlo" refreshing={refreshing} onRefresh={() => refresh(true)}
+    <Page title="Punto de venta" subtitle="Usa + para agregar o el ojo para revisar" refreshing={refreshing} onRefresh={() => refresh(true)}
       action={<Pressable onPress={() => setCartOpen(true)} style={styles.cartButton}><MaterialCommunityIcons name="cart-outline" size={23} color={colors.white} />{cartCount > 0 && <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{cartCount}</Text></View>}</Pressable>}>
       {!cashOpening && <View style={styles.closed}><MaterialCommunityIcons name="lock-outline" size={18} color={colors.warning} /><Text style={styles.closedText}>Debes abrir la caja antes de cobrar.</Text></View>}
       <Field value={search} onChangeText={setSearch} placeholder="Buscar nombre o código..." autoCapitalize="none" />
-      <Segmented<Filter> values={categories} value={category} onChange={setCategory} />
+      <Segmented<Filter> values={categoryOptions} value={category} onChange={setCategory} />
       <View style={styles.productGrid}>
-        {filtered.map(product => <ProductCard key={product.id} product={product} onAdd={() => addToCart(product)} />)}
+        {filtered.map(product => <ProductCard key={product.id} product={product} onAdd={() => addToCart(product)} onPreview={() => setPreviewProduct(product)} />)}
       </View>
       {filtered.length === 0 && <Card style={styles.emptyCard}><EmptyState icon="magnify" title="Sin resultados" message="Prueba con otro nombre o categoría." /></Card>}
       {cartCount > 0 && <Button title={`Ver carrito · ${cartCount} · ${money(cartSubtotal)}`} icon="cart-outline" onPress={() => setCartOpen(true)} style={styles.viewCart} />}
@@ -83,19 +82,27 @@ export function POSScreen() {
         </View>}
       </>}
     </Sheet>
+    <ProductPreviewSheet
+      product={previewProduct}
+      onClose={() => setPreviewProduct(null)}
+      primaryLabel="Agregar a venta"
+      primaryIcon="cart-plus"
+      onPrimary={(product) => { addToCart(product); setPreviewProduct(null); }}
+    />
   </>;
 }
 
-function ProductCard({ product, onAdd }: { product: Product; onAdd(): void }) {
+function ProductCard({ product, onAdd, onPreview }: { product: Product; onAdd(): void; onPreview(): void }) {
   const low = product.stock <= product.minStock;
-  return <Pressable onPress={onAdd} style={({ pressed }) => [styles.product, pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }]}>
+  return <View style={styles.product}>
     <View style={styles.productVisual}>
       {product.image ? <Image source={{ uri: product.image }} style={styles.productImage} /> : <View style={styles.productPlaceholder}><MaterialCommunityIcons name="package-variant-closed" size={30} color={colors.forest} /></View>}
       <View style={styles.stockPill}><Pill tone={low ? "danger" : "success"}>{product.stock}</Pill></View>
+      <Pressable onPress={onPreview} style={styles.previewButton} hitSlop={8}><MaterialCommunityIcons name="eye-outline" size={18} color={colors.forest} /></Pressable>
     </View>
     <Text style={styles.productName} numberOfLines={2}>{product.name}</Text><Text style={styles.productCode}>{product.code}</Text>
-    <View style={styles.productBottom}><Text style={styles.productPrice}>{money(product.price)}</Text><View style={styles.add}><MaterialCommunityIcons name="plus" size={19} color={colors.white} /></View></View>
-  </Pressable>;
+    <View style={styles.productBottom}><Text style={styles.productPrice}>{money(product.price)}</Text><Pressable onPress={onAdd} style={({ pressed }) => [styles.add, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]} hitSlop={8}><MaterialCommunityIcons name="plus" size={19} color={colors.white} /></Pressable></View>
+  </View>;
 }
 
 function Summary({ label, value, total, danger }: { label: string; value: string; total?: boolean; danger?: boolean }) {
@@ -107,6 +114,7 @@ const styles = StyleSheet.create({
   closed: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.goldSoft, borderRadius: 14, padding: 12, marginBottom: 14 }, closedText: { color: colors.warning, fontSize: 12, fontWeight: "700" },
   productGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 17 }, product: { width: "48%", flexGrow: 1, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 10, minHeight: 232, overflow: "hidden" },
   productVisual: { height: 104, borderRadius: 15, overflow: "hidden", backgroundColor: colors.forestSoft }, productImage: { width: "100%", height: "100%" }, productPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" }, stockPill: { position: "absolute", top: 7, right: 7 },
+  previewButton: { position: "absolute", left: 7, bottom: 7, width: 32, height: 32, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center", justifyContent: "center" },
   productName: { color: colors.ink, fontWeight: "800", fontSize: 14, minHeight: 37, marginTop: 10 }, productCode: { color: colors.muted, fontSize: 10, marginTop: 2 }, productBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }, productPrice: { color: colors.forest, fontWeight: "900", fontSize: 15 }, add: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
   emptyCard: { marginTop: 18 }, viewCart: { marginTop: 18 },
   cartRow: { minHeight: 75, flexDirection: "row", alignItems: "center", gap: 10 }, cartBorder: { borderTopWidth: 1, borderTopColor: colors.line }, cartProduct: { flex: 1 }, cartName: { color: colors.ink, fontWeight: "800", fontSize: 13 }, cartPrice: { color: colors.muted, fontSize: 11, marginTop: 3 },

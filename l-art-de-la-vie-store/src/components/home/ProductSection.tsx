@@ -26,6 +26,7 @@ export function ProductSection() {
       return catOk && qOk;
     });
   }, [data, filters]);
+  const categories = useMemo(() => Array.from(new Set((data ?? []).map(product => product.category))).sort((a, b) => a.localeCompare(b, "es")), [data]);
 
   return (
     <section id="coleccion" className="scroll-mt-24 bg-[color:var(--paper)]">
@@ -41,7 +42,7 @@ export function ProductSection() {
             description="El catálogo se sincroniza con las existencias de la tienda."
           />
           <div className="w-full max-w-xl md:max-w-md">
-            <ProductFilters value={filters} onChange={setFilters} />
+            <ProductFilters value={filters} onChange={setFilters} categories={categories} />
           </div>
         </div>
 

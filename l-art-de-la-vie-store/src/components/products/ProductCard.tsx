@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
+import { useState } from "react";
 import type { Product } from "@/types/product";
 import { formatL } from "@/lib/currency";
 import { useCart } from "@/hooks/useCart";
+import { ProductQuickView } from "./ProductQuickView";
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const { add, open } = useCart();
+  const [previewOpen, setPreviewOpen] = useState(false);
   const soldOut = product.stock <= 0;
 
   return (
@@ -16,7 +19,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
       transition={{ duration: 0.45, delay: (index % 8) * 0.05 }}
       className="group flex flex-col"
     >
-      <div className="relative overflow-hidden rounded-lg bg-[color:var(--cream)]">
+      <button type="button" onClick={() => setPreviewOpen(true)} className="relative overflow-hidden rounded-lg bg-[color:var(--cream)] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--gold)]" aria-label={`Ver detalles de ${product.name}`}>
         {product.image ? (
           <img
             src={product.image}
@@ -45,7 +48,8 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             Últimas {product.stock}
           </div>
         ) : null}
-      </div>
+        <span className="absolute bottom-3 left-3 grid h-10 w-10 translate-y-2 place-items-center rounded-full bg-[color:var(--paper)]/95 text-[color:var(--forest)] opacity-0 shadow-md transition duration-300 group-hover:translate-y-0 group-hover:opacity-100"><Eye className="h-4 w-4" /></span>
+      </button>
 
       <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -67,6 +71,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           <Plus className="h-4 w-4" />
         </button>
       </div>
+      <ProductQuickView product={previewOpen ? product : null} onClose={() => setPreviewOpen(false)} onAdd={(item, quantity) => { add(item, quantity); setPreviewOpen(false); open(); }} />
     </motion.article>
   );
 }

@@ -23,9 +23,15 @@ interface StoreValue extends StoreData {
   closeCash(actualCash: number): Promise<void>;
   addExpense(description: string, amount: number): Promise<void>;
   deleteExpense(id: string): Promise<void>;
+  addCategory(name: string): Promise<void>;
 }
 
-const empty: StoreData = { products: [], sales: [], movements: [], cashCloses: [], todayExpenses: [], cashOpening: null };
+const empty: StoreData = { products: [], categories: [], sales: [], movements: [], cashCloses: [], todayExpenses: [], cashOpening: null };
+const normalizeStore = (data: StoreData): StoreData => ({
+  ...data,
+  categories: (Array.isArray(data.categories) ? data.categories : [...new Set(data.products.map(product => product.category))])
+    .sort((left, right) => left.localeCompare(right, "es")),
+});
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: PropsWithChildren) {
@@ -39,7 +45,7 @@ export function StoreProvider({ children }: PropsWithChildren) {
     if (silent) setRefreshing(true); else setLoading(true);
     try {
       setError(null);
-      setStore(await api<StoreData>("/store"));
+      setStore(normalizeStore(await api<StoreData>("/store")));
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "No se pudo cargar la tienda";
       setError(message);
@@ -108,10 +114,14 @@ export function StoreProvider({ children }: PropsWithChildren) {
     await api<void>(`/expenses/${id}`, { method: "DELETE" });
     setStore(current => ({ ...current, todayExpenses: current.todayExpenses.filter(item => item.id !== id) }));
   };
+  const addCategory = async (name: string) => {
+    await api<{ name: string }>("/categories", { method: "POST", body: JSON.stringify({ name }) });
+    await refresh(true);
+  };
 
   const value = useMemo<StoreValue>(() => ({
     ...store, cart, loading, refreshing, error, refresh, addToCart, removeFromCart, updateCartQuantity, clearCart,
-    completeSale, addProduct, updateProduct, deleteProduct, addMovement, openCash, closeCash, addExpense, deleteExpense,
+    completeSale, addProduct, updateProduct, deleteProduct, addMovement, openCash, closeCash, addExpense, deleteExpense, addCategory,
     cartCount: cart.reduce((sum, item) => sum + item.quantity, 0),
     cartSubtotal: cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
   }), [store, cart, loading, refreshing, error, refresh]);
