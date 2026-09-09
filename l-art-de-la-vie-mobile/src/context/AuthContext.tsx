@@ -1,7 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { supabase } from "../lib/supabase";
+import { passwordResetUrl, supabase } from "../lib/supabase";
 import type { AppUser } from "../types";
 
 interface AuthValue {
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: passwordResetUrl });
     if (error) throw new Error("No se pudo enviar el correo de recuperación");
   };
 

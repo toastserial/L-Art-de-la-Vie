@@ -11,6 +11,7 @@ import { POSScreen } from "../screens/POSScreen";
 import { colors, money, shadow } from "../theme";
 import { BrandLogo } from "./BrandLogo";
 import { Button, Sheet } from "./ui";
+import { CashOpeningModal } from "./CashOpeningModal";
 
 type Tab = "home" | "pos" | "inventory" | "cash";
 const tabs: { id: Tab; label: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"] }[] = [
@@ -22,11 +23,12 @@ const tabs: { id: Tab; label: string; icon: React.ComponentProps<typeof Material
 
 export function AppShell() {
   const { user, signOut } = useAuth();
-  const { cartCount, cartSubtotal } = useStore();
+  const { cartCount, cartSubtotal, cashOpening } = useStore();
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<Tab>("home");
   const [accountOpen, setAccountOpen] = useState(false);
+  const [cashPromptOpen, setCashPromptOpen] = useState(!cashOpening);
   const Screen = tab === "home" ? DashboardScreen : tab === "pos" ? POSScreen : tab === "inventory" ? InventoryScreen : CashScreen;
   const role = user?.role === "owner" ? "Propietario" : user?.role === "admin" ? "Administrador" : "Cajero";
   const username = user?.email.split("@")[0] || "usuario";
@@ -45,6 +47,8 @@ export function AppShell() {
         <View style={styles.avatarOnline} />
       </Pressable>
     </View>
+
+    {!cashOpening && <Pressable onPress={() => setCashPromptOpen(true)} style={({ pressed }) => [styles.cashReminder, pressed && styles.pressed]}><View style={styles.cashReminderDot} /><MaterialCommunityIcons name="cash-register" size={16} color={colors.warning} /><Text style={styles.cashReminderText}>Caja pendiente</Text><Text style={styles.cashReminderAction}>Abrir ahora</Text><MaterialCommunityIcons name="chevron-right" size={17} color={colors.warning} /></Pressable>}
 
     <View style={styles.screen}><Screen /></View>
 
@@ -74,6 +78,7 @@ export function AppShell() {
       </View>}
       <Button title="Cerrar sesión" variant="danger" icon="logout" onPress={() => Alert.alert("Cerrar sesión", "¿Quieres salir de la aplicación?", [{ text: "Cancelar" }, { text: "Salir", style: "destructive", onPress: () => signOut() }])} />
     </Sheet>
+    <CashOpeningModal visible={cashPromptOpen && !cashOpening} onClose={() => setCashPromptOpen(false)} onInventory={() => { setCashPromptOpen(false); setTab("inventory"); }} />
   </SafeAreaView>;
 }
 
@@ -92,6 +97,7 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 15, backgroundColor: colors.goldSoft, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E4D293" },
   avatarText: { color: colors.warning, fontWeight: "900", fontSize: 15 },
   avatarOnline: { position: "absolute", width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white, right: -1, bottom: -1 },
+  cashReminder: { minHeight: 39, flexDirection: "row", alignItems: "center", paddingHorizontal: 15, gap: 7, backgroundColor: colors.goldSoft, borderBottomWidth: 1, borderBottomColor: "#E9D99E" }, cashReminderDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.gold }, cashReminderText: { color: colors.warning, fontSize: 11, fontWeight: "800", flex: 1 }, cashReminderAction: { color: colors.warning, fontSize: 10, fontWeight: "900" },
   pressed: { opacity: 0.7 },
   bottom: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, flexDirection: "row", paddingTop: 8, paddingHorizontal: 6, ...shadow },
   tab: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 },

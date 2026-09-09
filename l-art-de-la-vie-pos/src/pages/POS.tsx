@@ -9,12 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Search, Plus, Minus, Trash2, ShoppingBag, Printer, Eye } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingBag, Printer, Eye, LockKeyhole } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
+import { useCashPrompt } from "@/components/AppLayout";
 
 export default function POS() {
-  const { products, cart, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
+  const { products, cart, cashOpening, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
+  const openCashPrompt = useCashPrompt();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("efectivo");
@@ -34,6 +36,7 @@ export default function POS() {
   const change = paymentMethod === "efectivo" ? cashReceived - total : 0;
 
   const handleCompleteSale = async () => {
+    if (!cashOpening) { openCashPrompt?.(); return; }
     if (cart.length === 0) { toast({ title: "Carrito vacío", variant: "destructive" }); return; }
     if (paymentMethod === "efectivo" && cashReceived < total) { toast({ title: "Monto insuficiente", variant: "destructive" }); return; }
     try {
@@ -51,6 +54,7 @@ export default function POS() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-display font-bold">Punto de Venta</h1>
+      {!cashOpening && <button type="button" onClick={() => openCashPrompt?.()} className="flex w-full items-center gap-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-left transition hover:bg-accent/15"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground"><LockKeyhole className="h-4 w-4" /></span><span className="flex-1"><span className="block text-sm font-semibold">Abre la caja antes de cobrar</span><span className="block text-xs text-muted-foreground">Puedes preparar el carrito mientras tanto.</span></span><span className="text-xs font-semibold text-primary">Abrir ahora</span></button>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product catalog */}
@@ -155,7 +159,7 @@ export default function POS() {
 
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1" onClick={clearCart}>Vaciar</Button>
-                  <Button className="flex-1" onClick={handleCompleteSale}>Cobrar</Button>
+                  <Button className="flex-1" onClick={handleCompleteSale}>{cashOpening ? "Cobrar" : "Abrir caja"}</Button>
                 </div>
               </>
             )}

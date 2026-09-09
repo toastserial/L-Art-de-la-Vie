@@ -2,7 +2,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { AppShell } from "./src/components/AppShell";
-import { CashOpeningModal } from "./src/components/CashOpeningModal";
 import { Button } from "./src/components/ui";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { StoreProvider, useStore } from "./src/context/StoreContext";
@@ -26,7 +25,7 @@ function StoreGate() {
   const { loading, error, refresh } = useStore();
   if (loading) return <Loading message="Cargando la tienda..." />;
   if (error) return <View style={styles.errorPage}><View style={styles.errorIcon}><MaterialCommunityIcons name="wifi-alert" size={34} color={colors.danger} /></View><Text style={styles.errorTitle}>No pudimos conectar</Text><Text style={styles.errorMessage}>{error}</Text><Button title="Intentar nuevamente" icon="refresh" onPress={() => refresh()} /></View>;
-  return <><AppShell /><CashOpeningModal /></>;
+  return <AppShell />;
 }
 
 function Loading({ message }: { message: string }) {
