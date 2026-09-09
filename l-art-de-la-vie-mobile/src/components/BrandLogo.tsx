@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
 
 interface BrandLogoProps {
   size?: number;
@@ -13,19 +13,24 @@ export function BrandLogo({ size = 140, animated = true }: BrandLogoProps) {
 
   useEffect(() => {
     if (!animated) return;
-    const animation = Animated.sequence([
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 650, easing: Easing.out(Easing.back(1.15)), useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 650, easing: Easing.out(Easing.back(1.15)), useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.045, duration: 240, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]),
-    ]);
-    animation.start();
-    return () => animation.stop();
+    let mounted = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!mounted) return;
+      if (reduceMotion) {
+        opacity.setValue(1);
+        translateY.setValue(0);
+        scale.setValue(1);
+        return;
+      }
+      animation = Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]);
+      animation.start();
+    });
+    return () => { mounted = false; animation?.stop(); };
   }, [animated, opacity, scale, translateY]);
 
   return <View style={[styles.shadow, { width: size, height: size, borderRadius: size / 2 }]}>

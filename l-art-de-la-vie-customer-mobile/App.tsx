@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   Animated,
@@ -19,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { ViewStyle } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { api } from "./src/lib/api";
 import { authRedirectUrl, handleAuthDeepLink, supabase } from "./src/lib/supabase";
@@ -39,7 +41,14 @@ export default function App() {
   const [catalogCategory, setCatalogCategory] = useState<string>();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [recoveringPassword, setRecoveringPassword] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const screenOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -123,6 +132,11 @@ export default function App() {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const changeTab = (next: Tab) => {
     if (next === tab) return;
+    if (reduceMotion) {
+      screenOpacity.setValue(1);
+      setTab(next);
+      return;
+    }
     Animated.timing(screenOpacity, {
       toValue: 0,
       duration: 80,
@@ -862,11 +876,43 @@ function Empty({
   );
 }
 function Loading() {
+  const opacity = useRef(new Animated.Value(0.48)).current;
+  useEffect(() => {
+    let mounted = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!mounted || reduceMotion) return;
+      animation = Animated.loop(Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.88, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.48, duration: 700, useNativeDriver: true }),
+      ]));
+      animation.start();
+    });
+    return () => { mounted = false; animation?.stop(); };
+  }, [opacity]);
+  const block = (style: ViewStyle) => <Animated.View style={[styles.loadingBlock, style, { opacity }]} />;
   return (
     <View style={styles.loading}>
-      <Image source={require("./assets/logo.png")} style={styles.loadingLogo} />
-      <ActivityIndicator color={colors.gold} />
-      <Text style={styles.muted}>Preparando tu experiencia…</Text>
+      <View style={styles.loadingBrand}>
+        <Image source={require("./assets/logo.png")} style={styles.loadingLogo} />
+        <View>
+          <Text style={styles.loadingEyebrow}>BOUTIQUE</Text>
+          <Text style={styles.loadingName}>L'Art de la Vie</Text>
+        </View>
+      </View>
+      <View style={styles.loadingPreview} accessibilityLabel="Cargando la boutique">
+        {block(styles.loadingHero)}
+        {block(styles.loadingTitle)}
+        {block(styles.loadingCopy)}
+        <View style={styles.loadingGrid}>
+          {block(styles.loadingProduct)}
+          {block(styles.loadingProduct)}
+        </View>
+      </View>
+      <View style={styles.loadingStatus}>
+        <ActivityIndicator size="small" color={colors.gold} />
+        <Text style={styles.loadingText}>Preparando tu experiencia…</Text>
+      </View>
     </View>
   );
 }
@@ -874,8 +920,20 @@ function Loading() {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.cream },
   body: { flex: 1 },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18, backgroundColor: colors.forest },
-  loadingLogo: { width: 120, height: 120, borderRadius: 60 },
+  loading: { flex: 1, justifyContent: "center", gap: 22, paddingHorizontal: 22, backgroundColor: colors.forest },
+  loadingBrand: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingLogo: { width: 58, height: 58, borderRadius: 29 },
+  loadingEyebrow: { color: colors.gold, fontSize: 8, fontWeight: "900", letterSpacing: 2.2 },
+  loadingName: { color: colors.cream, fontFamily: "serif", fontWeight: "700", fontSize: 20, marginTop: 2 },
+  loadingPreview: { width: "100%", maxWidth: 390, alignSelf: "center", padding: 15, borderRadius: 25, backgroundColor: colors.paper },
+  loadingBlock: { overflow: "hidden", borderRadius: 12, backgroundColor: "#E2E7E3" },
+  loadingHero: { width: "100%", height: 118, borderRadius: 18 },
+  loadingTitle: { width: "58%", height: 18, marginTop: 16 },
+  loadingCopy: { width: "36%", height: 10, marginTop: 8 },
+  loadingGrid: { flexDirection: "row", gap: 10, marginTop: 17 },
+  loadingProduct: { flex: 1, height: 130, borderRadius: 16 },
+  loadingStatus: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 9 },
+  loadingText: { color: "#D4DDD7", fontSize: 12 },
   auth: { flex: 1, backgroundColor: colors.cream, justifyContent: "center", padding: 16 },
   authBackdrop: { position: "absolute", left: 0, right: 0, top: 0, width: "115%", height: 300, opacity: 0.76 },
   authShade: { position: "absolute", left: 0, right: 0, top: 0, height: 310 },

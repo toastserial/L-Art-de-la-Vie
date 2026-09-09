@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { WalletCards } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -12,6 +12,7 @@ export const useCashPrompt = () => useContext(CashPromptContext);
 export function AppLayout({ children }: { children: ReactNode }) {
   const { cashOpening } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cashPromptOpen, setCashPromptOpen] = useState(!cashOpening);
 
   useEffect(() => { if (cashOpening) setCashPromptOpen(false); }, [cashOpening]);
@@ -32,7 +33,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               {!cashOpening && <button type="button" onClick={() => setCashPromptOpen(true)} className="flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent/20"><span className="h-2 w-2 rounded-full bg-accent" /><WalletCards className="h-3.5 w-3.5 text-primary" />Caja pendiente <span className="hidden text-primary sm:inline">· Abrir</span></button>}
             </div>
           </header>
-          <div className="flex-1 p-6 overflow-auto">
+          <div key={location.pathname} className="page-enter flex-1 p-4 overflow-auto sm:p-6">
             {children}
           </div>
         </main>

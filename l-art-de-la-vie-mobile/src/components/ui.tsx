@@ -1,10 +1,29 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useEffect, useRef } from "react";
 import type { ComponentProps, PropsWithChildren, ReactNode } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 import { colors, shadow } from "../theme";
 
 export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle | ViewStyle[] }>) {
   return <View style={[styles.card, style]}>{children}</View>;
+}
+
+export function Skeleton({ style }: { style?: ViewStyle | ViewStyle[] }) {
+  const opacity = useRef(new Animated.Value(0.48)).current;
+  useEffect(() => {
+    let mounted = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!mounted || reduceMotion) return;
+      animation = Animated.loop(Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.9, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.48, duration: 700, useNativeDriver: true }),
+      ]));
+      animation.start();
+    });
+    return () => { mounted = false; animation?.stop(); };
+  }, [opacity]);
+  return <Animated.View style={[styles.skeleton, { opacity }, style]} />;
 }
 
 interface ButtonProps {
@@ -88,6 +107,7 @@ export function Segmented<T extends string>({ values, value, onChange }: { value
 
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: 16, ...shadow },
+  skeleton: { overflow: "hidden", borderRadius: 12, backgroundColor: "#E4E9E5" },
   button: { minHeight: 52, borderRadius: 16, paddingHorizontal: 18, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   buttonCompact: { minHeight: 38, borderRadius: 12, paddingHorizontal: 12 },
   buttonText: { fontSize: 15, fontWeight: "800" },

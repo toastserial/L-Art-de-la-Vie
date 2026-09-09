@@ -16,6 +16,7 @@ import CashClose from "./pages/CashClose";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import { SessionLoading, StoreLoadingSkeleton } from "@/components/AppLoading";
 
 const queryClient = new QueryClient();
 
@@ -23,14 +24,14 @@ const FullScreenMessage = ({ children }: { children: ReactNode }) => <div classN
 
 function StoreGate({ children }: { children: ReactNode }) {
   const { loading, error, refresh } = useStore();
-  if (loading) return <FullScreenMessage><p className="text-muted-foreground">Cargando información de la tienda...</p></FullScreenMessage>;
+  if (loading) return <StoreLoadingSkeleton />;
   if (error) return <FullScreenMessage><div className="max-w-md space-y-4"><h1 className="text-xl font-bold">No se pudo conectar con el backend</h1><p className="text-muted-foreground">{error}</p><Button onClick={() => refresh().catch(() => undefined)}>Reintentar</Button></div></FullScreenMessage>;
   return <>{children}</>;
 }
 
 function ProtectedApp() {
   const { user, loading } = useAuth();
-  if (loading) return <FullScreenMessage><p className="text-muted-foreground">Verificando sesión...</p></FullScreenMessage>;
+  if (loading) return <SessionLoading />;
   if (!user) return <Navigate to="/login" replace />;
   return <StoreProvider><StoreGate><AppLayout><Routes><Route path="/" element={<Dashboard />} /><Route path="/inventario" element={<Inventory />} /><Route path="/pos" element={<POS />} /><Route path="/cierre" element={<CashClose />} /><Route path="*" element={<NotFound />} /></Routes></AppLayout></StoreGate></StoreProvider>;
 }

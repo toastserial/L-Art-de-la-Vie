@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Eye, Plus } from "lucide-react";
 import { useState } from "react";
 import type { Product } from "@/types/product";
@@ -10,13 +10,14 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
   const { add, open } = useCart();
   const [previewOpen, setPreviewOpen] = useState(false);
   const soldOut = product.stock <= 0;
+  const reduceMotion = useReducedMotion();
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.45, delay: (index % 8) * 0.05 }}
+      transition={{ duration: 0.28, delay: Math.min(index, 3) * 0.035 }}
       className="group flex flex-col"
     >
       <button type="button" onClick={() => setPreviewOpen(true)} className="relative overflow-hidden rounded-lg bg-[color:var(--cream)] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--gold)]" aria-label={`Ver detalles de ${product.name}`}>
@@ -25,7 +26,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             src={product.image}
             alt={product.name}
             loading="lazy"
-            className="aspect-[4/5] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+            className="aspect-[4/5] w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.025]"
           />
         ) : (
           <div className="grid aspect-[4/5] w-full place-items-center bg-[linear-gradient(145deg,var(--cream),#d8e0d7)] text-center">
