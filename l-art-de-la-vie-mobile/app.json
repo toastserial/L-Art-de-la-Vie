@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.lartdelavie.pos",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#00451F",
         "foregroundImage": "./assets/lartdela.png"
@@ -31,7 +32,8 @@
           "cameraPermission": "L'Art de la Vie necesita usar la cámara para fotografiar productos.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

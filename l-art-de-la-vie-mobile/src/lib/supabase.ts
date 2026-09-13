@@ -21,6 +21,9 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
+      // El flujo PKCE permite intercambiar de forma segura el código que
+      // devuelve Google por una sesión dentro de la app nativa.
+      flowType: "pkce",
     },
   },
 );

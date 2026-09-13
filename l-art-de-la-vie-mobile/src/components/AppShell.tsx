@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
@@ -29,10 +29,21 @@ export function AppShell() {
   const [tab, setTab] = useState<Tab>("home");
   const [accountOpen, setAccountOpen] = useState(false);
   const [cashPromptOpen, setCashPromptOpen] = useState(!cashOpening);
+  const screenEntrance = useRef(new Animated.Value(1)).current;
   const Screen = tab === "home" ? DashboardScreen : tab === "pos" ? POSScreen : tab === "inventory" ? InventoryScreen : CashScreen;
   const role = user?.role === "owner" ? "Propietario" : user?.role === "admin" ? "Administrador" : "Cajero";
   const username = user?.email.split("@")[0] || "usuario";
   const compact = width < 350;
+
+  useEffect(() => {
+    screenEntrance.setValue(0);
+    Animated.timing(screenEntrance, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [screenEntrance, tab]);
 
   return <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
     <View style={styles.topbar}>
@@ -50,7 +61,7 @@ export function AppShell() {
 
     {!cashOpening && <Pressable onPress={() => setCashPromptOpen(true)} style={({ pressed }) => [styles.cashReminder, pressed && styles.pressed]}><View style={styles.cashReminderDot} /><MaterialCommunityIcons name="cash-register" size={16} color={colors.warning} /><Text style={styles.cashReminderText}>Caja pendiente</Text><Text style={styles.cashReminderAction}>Abrir ahora</Text><MaterialCommunityIcons name="chevron-right" size={17} color={colors.warning} /></Pressable>}
 
-    <View style={styles.screen}><Screen /></View>
+    <Animated.View style={[styles.screen, { opacity: screenEntrance, transform: [{ translateY: screenEntrance.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }]}><Screen /></Animated.View>
 
     <View style={[styles.bottom, { paddingBottom: Math.max(bottom, 8) }]}>
       {tabs.map(item => {

@@ -21,6 +21,7 @@ export function ProductFilters({
         <span className="sr-only">Buscar producto</span>
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--ink-muted)]" />
         <input
+          id="catalog-search"
           type="search"
           placeholder="Buscar por nombre…"
           value={value.query}

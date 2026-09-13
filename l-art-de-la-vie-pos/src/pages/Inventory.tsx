@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/context/StoreContext";
 import { Product, Category } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { uploadProductImage } from "@/lib/api";
 import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
+import { ListPagination } from "@/components/ListPagination";
 
 type ProductForm = Omit<Product, "id" | "code">;
 const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, stock: 0, minStock: 3 };
@@ -35,6 +36,9 @@ export default function Inventory() {
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [categoryDialog, setCategoryDialog] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  const [productPage, setProductPage] = useState(1);
+  const [movementPage, setMovementPage] = useState(1);
+  const pageSize = 10;
   const [movementDialog, setMovementDialog] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -46,6 +50,11 @@ export default function Inventory() {
     const matchCat = filterCategory === "all" || p.category === filterCategory;
     return matchSearch && matchCat;
   });
+  const visibleProducts = filtered.slice((productPage - 1) * pageSize, productPage * pageSize);
+  const visibleMovements = movements.slice((movementPage - 1) * pageSize, movementPage * pageSize);
+  useEffect(() => { setProductPage(1); }, [search, filterCategory]);
+  useEffect(() => { if ((productPage - 1) * pageSize >= filtered.length) setProductPage(Math.max(1, Math.ceil(filtered.length / pageSize))); }, [filtered.length, productPage]);
+  useEffect(() => { if ((movementPage - 1) * pageSize >= movements.length) setMovementPage(Math.max(1, Math.ceil(movements.length / pageSize))); }, [movements.length, movementPage]);
 
   const openAdd = () => {
     if (categories.length === 0) { setCategoryDialog(true); return; }
@@ -156,8 +165,8 @@ export default function Inventory() {
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {filtered.map((p) => (
+                <TableBody key={productPage} className="list-enter">
+                  {visibleProducts.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-mono text-xs">{p.code}</TableCell>
                       <TableCell>
@@ -208,6 +217,7 @@ export default function Inventory() {
                   )}
                 </TableBody>
               </Table>
+              <ListPagination page={productPage} total={filtered.length} onPageChange={setProductPage} itemLabel="productos" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -226,8 +236,8 @@ export default function Inventory() {
                     <TableHead>Nota</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {movements.map((m) => (
+                <TableBody key={movementPage} className="list-enter">
+                  {visibleMovements.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="text-sm">{new Date(m.date).toLocaleString("es")}</TableCell>
                       <TableCell>{m.productName}</TableCell>
@@ -242,6 +252,7 @@ export default function Inventory() {
                   ))}
                 </TableBody>
               </Table>
+              <ListPagination page={movementPage} total={movements.length} onPageChange={setMovementPage} itemLabel="movimientos" />
             </CardContent>
           </Card>
         </TabsContent>

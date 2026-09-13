@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/context/StoreContext";
 import { PaymentMethod, Sale } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Search, Plus, Minus, Trash2, ShoppingBag, Printer, Eye, LockKeyhole } f
 import { useToast } from "@/hooks/use-toast";
 import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
 import { useCashPrompt } from "@/components/AppLayout";
+import { ListPagination } from "@/components/ListPagination";
 
 export default function POS() {
   const { products, cart, cashOpening, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
@@ -25,10 +26,15 @@ export default function POS() {
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [previewProduct, setPreviewProduct] = useState<import("@/types").Product | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const filteredProducts = products.filter(
     (p) => p.stock > 0 && (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
   );
+  const visibleProducts = filteredProducts.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { if ((page - 1) * pageSize >= filteredProducts.length) setPage(Math.max(1, Math.ceil(filteredProducts.length / pageSize))); }, [filteredProducts.length, page]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const discountAmount = subtotal * (discount / 100);
@@ -63,8 +69,8 @@ export default function POS() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar producto por nombre o código..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {filteredProducts.map((p) => (
+          <div key={page} className="list-enter grid grid-cols-2 md:grid-cols-3 gap-3">
+            {visibleProducts.map((p) => (
               <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => addToCart(p)}>
                 <CardContent className="p-3">
                   <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl bg-secondary">
@@ -85,6 +91,7 @@ export default function POS() {
               <p className="col-span-full text-center text-muted-foreground py-8">No se encontraron productos.</p>
             )}
           </div>
+          <ListPagination page={page} total={filteredProducts.length} onPageChange={setPage} itemLabel="productos" />
         </div>
 
         {/* Cart */}
@@ -126,10 +133,12 @@ export default function POS() {
                 <Separator />
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span>Subtotal</span><span>L {subtotal.toFixed(2)}</span></div>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Descuento %</Label>
-                    <Input type="number" min={0} max={100} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="w-20 h-8" />
-                    {discountAmount > 0 && <span className="text-destructive text-sm">-L {discountAmount.toFixed(2)}</span>}
+                  <div className="rounded-xl bg-muted/45 p-3">
+                    <div className="flex items-center justify-between gap-3"><Label className="text-sm">Descuento</Label>{discountAmount > 0 && <span className="text-sm font-semibold text-destructive">-L {discountAmount.toFixed(2)}</span>}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {[0, 5, 10, 15].map((value) => <Button key={value} type="button" size="sm" variant={discount === value ? "default" : "outline"} className="h-8 min-w-11" onClick={() => setDiscount(value)}>{value}%</Button>)}
+                      <div className="relative ml-auto"><Input aria-label="Descuento personalizado" type="number" min={0} max={100} value={discount} onChange={(e) => setDiscount(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className="h-8 w-20 pr-7" /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span></div>
+                    </div>
                   </div>
                   <div className="flex justify-between font-bold text-lg"><span>Total</span><span>L {total.toFixed(2)}</span></div>
                 </div>

@@ -114,11 +114,13 @@
     animation: skeleton-sweep 1.45s ease-in-out infinite;
   }
   .page-enter { animation: page-enter 220ms cubic-bezier(.22, 1, .36, 1); }
+  .list-enter { animation: list-enter 180ms cubic-bezier(.22, 1, .36, 1); }
   .loading-dot { width: 7px; height: 7px; border-radius: 999px; background: hsl(var(--accent)); animation: loading-dot 900ms ease-in-out infinite alternate; }
 }
 
 @keyframes skeleton-sweep { to { transform: translateX(100%); } }
 @keyframes page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes list-enter { from { opacity: 0; transform: translateX(3px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes loading-dot { from { opacity: .3; transform: translateY(2px); } to { opacity: 1; transform: translateY(-2px); } }
 
 @media (prefers-reduced-motion: reduce) {

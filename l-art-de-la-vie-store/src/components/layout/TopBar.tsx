@@ -1,21 +1,24 @@
-import { motion } from "framer-motion";
+const messages = Array.from({ length: 6 }, (_, index) => (
+  <span key={index} className="flex shrink-0 items-center gap-6 pr-6 sm:gap-10 sm:pr-10">
+    <span>Hacemos envíos a todo Honduras</span>
+    <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--gold)]" aria-hidden />
+  </span>
+));
 
 export function TopBar() {
   return (
     <div
-      className="bg-[color:var(--forest)] text-[color:var(--cream)]"
+      className="overflow-hidden border-b border-black/10 bg-white text-[color:var(--ink)]"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2 text-[0.72rem] uppercase tracking-[0.28em]"
+      <span className="sr-only">Hacemos envíos a todo Honduras</span>
+      <div
+        className="shipping-marquee flex w-max py-2 text-[0.7rem] font-extrabold uppercase tracking-[0.08em] sm:py-2.5 sm:text-xs sm:tracking-[0.1em]"
+        aria-hidden="true"
       >
-        <span className="inline-block h-1 w-1 rounded-full bg-[color:var(--gold)]" aria-hidden />
-        <span className="text-center">Detalles que transforman espacios y momentos</span>
-        <span className="inline-block h-1 w-1 rounded-full bg-[color:var(--gold)]" aria-hidden />
-      </motion.div>
+        <div className="flex shrink-0">{messages}</div>
+        <div className="flex shrink-0">{messages}</div>
+      </div>
     </div>
   );
 }

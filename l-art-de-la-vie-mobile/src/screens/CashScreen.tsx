@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Card, EmptyState, Field, Pill, Segmented, Sheet } from "../components/ui";
+import { Button, Card, EmptyState, Field, PaginationControls, Pill, Segmented, Sheet } from "../components/ui";
 import { Page } from "../components/Page";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
@@ -17,6 +17,9 @@ export function CashScreen() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [actualCash, setActualCash] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expensePage, setExpensePage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const pageSize = 10;
   const today = localDay(new Date());
   const closedToday = cashCloses.some(close => close.date === today || localDay(close.date) === today);
   const todaySales = sales.filter(sale => localDay(sale.date) === today);
@@ -27,6 +30,10 @@ export function CashScreen() {
   const expenses = todayExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const expected = (cashOpening?.openingCash || 0) + cashSales - expenses;
   const actual = Number(actualCash) || 0;
+  const visibleExpenses = todayExpenses.slice((expensePage - 1) * pageSize, expensePage * pageSize);
+  const visibleCloses = cashCloses.slice((historyPage - 1) * pageSize, historyPage * pageSize);
+  useEffect(() => { if ((expensePage - 1) * pageSize >= todayExpenses.length) setExpensePage(Math.max(1, Math.ceil(todayExpenses.length / pageSize))); }, [todayExpenses.length, expensePage]);
+  useEffect(() => { if ((historyPage - 1) * pageSize >= cashCloses.length) setHistoryPage(Math.max(1, Math.ceil(cashCloses.length / pageSize))); }, [cashCloses.length, historyPage]);
 
   const saveExpense = async () => {
     const amount = Number(expenseAmount);
@@ -55,7 +62,8 @@ export function CashScreen() {
         <View style={styles.grid}><CashMetric icon="cash" label="Efectivo" value={cashSales} /><CashMetric icon="credit-card-outline" label="Tarjeta" value={cardSales} /><CashMetric icon="bank-transfer" label="Transferencia" value={transfers} /><CashMetric icon="chart-line" label="Total ventas" value={totalSales} /></View>
         <Text style={styles.sectionTitle}>Gastos del día</Text>
         <Card style={styles.cardList}>
-          {todayExpenses.length === 0 ? <EmptyState icon="cash-minus" title="Sin gastos" message="No se han registrado salidas de efectivo hoy." /> : todayExpenses.map((expense, index) => <View key={expense.id} style={[styles.expenseRow, index > 0 && styles.border]}><View style={styles.expenseIcon}><MaterialCommunityIcons name="cash-minus" size={20} color={colors.danger} /></View><View style={styles.expenseText}><Text style={styles.expenseName}>{expense.description}</Text><Text style={styles.expenseDate}>{shortDate(expense.date)}</Text></View><Text style={styles.expenseValue}>-{money(expense.amount)}</Text>{canManage && !closedToday && <Pressable onPress={() => Alert.alert("Eliminar gasto", `¿Eliminar ${expense.description}?`, [{ text: "Cancelar" }, { text: "Eliminar", style: "destructive", onPress: () => deleteExpense(expense.id).catch(reason => Alert.alert("No se eliminó", reason instanceof Error ? reason.message : "Intenta nuevamente")) }])} hitSlop={10}><MaterialCommunityIcons name="trash-can-outline" size={20} color={colors.danger} /></Pressable>}</View>)}
+          {todayExpenses.length === 0 ? <EmptyState icon="cash-minus" title="Sin gastos" message="No se han registrado salidas de efectivo hoy." /> : visibleExpenses.map((expense, index) => <View key={expense.id} style={[styles.expenseRow, index > 0 && styles.border]}><View style={styles.expenseIcon}><MaterialCommunityIcons name="cash-minus" size={20} color={colors.danger} /></View><View style={styles.expenseText}><Text style={styles.expenseName}>{expense.description}</Text><Text style={styles.expenseDate}>{shortDate(expense.date)}</Text></View><Text style={styles.expenseValue}>-{money(expense.amount)}</Text>{canManage && !closedToday && <Pressable onPress={() => Alert.alert("Eliminar gasto", `¿Eliminar ${expense.description}?`, [{ text: "Cancelar" }, { text: "Eliminar", style: "destructive", onPress: () => deleteExpense(expense.id).catch(reason => Alert.alert("No se eliminó", reason instanceof Error ? reason.message : "Intenta nuevamente")) }])} hitSlop={10}><MaterialCommunityIcons name="trash-can-outline" size={20} color={colors.danger} /></Pressable>}</View>)}
+          <PaginationControls page={expensePage} total={todayExpenses.length} onPageChange={setExpensePage} />
         </Card>
         {!closedToday && cashOpening && <Button title="Registrar gasto" variant="secondary" icon="plus" onPress={() => setExpenseOpen(true)} style={styles.action} />}
         <Text style={styles.sectionTitle}>Resumen de efectivo</Text><Card>
@@ -63,7 +71,8 @@ export function CashScreen() {
         </Card>
         {canManage && !closedToday && cashOpening && <Button title="Cerrar caja" icon="lock-outline" onPress={() => setCloseOpen(true)} style={styles.closeButton} />}
       </> : <Card style={[styles.cardList, styles.history]}>
-        {cashCloses.length === 0 ? <EmptyState icon="history" title="Sin cierres" message="Los cierres diarios aparecerán aquí." /> : cashCloses.map((close, index) => <View key={close.id} style={[styles.historyRow, index > 0 && styles.border]}><View style={styles.calendar}><Text style={styles.calendarDay}>{new Date(close.date).getUTCDate()}</Text><Text style={styles.calendarMonth}>{new Date(close.date).toLocaleDateString("es-HN", { month: "short", timeZone: "UTC" })}</Text></View><View style={styles.expenseText}><Text style={styles.expenseName}>{money(close.totalSales)} en ventas</Text><Text style={styles.expenseDate}>Esperado {money(close.expectedCash)} · Real {money(close.actualCash)}</Text></View><Pill tone={close.difference === 0 ? "success" : "danger"}>{close.difference >= 0 ? "+" : ""}{money(close.difference)}</Pill></View>)}
+        {cashCloses.length === 0 ? <EmptyState icon="history" title="Sin cierres" message="Los cierres diarios aparecerán aquí." /> : visibleCloses.map((close, index) => <View key={close.id} style={[styles.historyRow, index > 0 && styles.border]}><View style={styles.calendar}><Text style={styles.calendarDay}>{new Date(close.date).getUTCDate()}</Text><Text style={styles.calendarMonth}>{new Date(close.date).toLocaleDateString("es-HN", { month: "short", timeZone: "UTC" })}</Text></View><View style={styles.expenseText}><Text style={styles.expenseName}>{money(close.totalSales)} en ventas</Text><Text style={styles.expenseDate}>Esperado {money(close.expectedCash)} · Real {money(close.actualCash)}</Text></View><Pill tone={close.difference === 0 ? "success" : "danger"}>{close.difference >= 0 ? "+" : ""}{money(close.difference)}</Pill></View>)}
+        <PaginationControls page={historyPage} total={cashCloses.length} onPageChange={setHistoryPage} />
       </Card>}
     </Page>
 

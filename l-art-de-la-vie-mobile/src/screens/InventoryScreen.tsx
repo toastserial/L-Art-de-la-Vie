@@ -1,9 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { File, Paths } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Card, EmptyState, Field, Pill, Segmented, Sheet } from "../components/ui";
+import { Button, Card, EmptyState, Field, PaginationControls, Pill, Segmented, Sheet } from "../components/ui";
 import { Page } from "../components/Page";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
@@ -37,8 +37,16 @@ export function InventoryScreen() {
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  const [productPage, setProductPage] = useState(1);
+  const [movementPage, setMovementPage] = useState(1);
+  const pageSize = 10;
 
   const filtered = useMemo(() => products.filter(product => `${product.name} ${product.code} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
+  const visibleProducts = filtered.slice((productPage - 1) * pageSize, productPage * pageSize);
+  const visibleMovements = movements.slice((movementPage - 1) * pageSize, movementPage * pageSize);
+  useEffect(() => { setProductPage(1); }, [search]);
+  useEffect(() => { if ((productPage - 1) * pageSize >= filtered.length) setProductPage(Math.max(1, Math.ceil(filtered.length / pageSize))); }, [filtered.length, productPage]);
+  useEffect(() => { if ((movementPage - 1) * pageSize >= movements.length) setMovementPage(Math.max(1, Math.ceil(movements.length / pageSize))); }, [movements.length, movementPage]);
   const categoryOptions = useMemo(() => categories.map(value => ({ value, label: value })), [categories]);
   const openNew = () => {
     const firstCategory = categories[0];
@@ -143,7 +151,7 @@ export function InventoryScreen() {
         {canManage && <Button title="Nueva categoría" icon="folder-plus-outline" variant="ghost" compact onPress={() => setCategoryOpen(true)} style={styles.categoryButton} />}
         <View style={styles.search}><Field value={search} onChangeText={setSearch} placeholder="Buscar producto..." /></View>
         <Card style={styles.list}>
-          {filtered.length === 0 ? <EmptyState icon="package-variant" title="Sin productos" message="No encontramos productos con esa búsqueda." /> : filtered.map((product, index) => {
+          {filtered.length === 0 ? <EmptyState icon="package-variant" title="Sin productos" message="No encontramos productos con esa búsqueda." /> : visibleProducts.map((product, index) => {
             const low = product.stock <= product.minStock;
             return <Pressable key={product.id} onPress={() => setPreviewProduct(product)} style={[styles.row, index > 0 && styles.border]}>
               {product.image ? <Image source={{ uri: product.image }} style={styles.productThumb} /> : <View style={styles.initial}><Text style={styles.initialText}>{product.name.charAt(0)}</Text></View>}
@@ -152,13 +160,15 @@ export function InventoryScreen() {
             </Pressable>;
           })}
         </Card>
+        <PaginationControls page={productPage} total={filtered.length} onPageChange={setProductPage} />
       </> : <Card style={[styles.list, styles.movements]}>
-        {movements.length === 0 ? <EmptyState icon="swap-vertical" title="Sin movimientos" message="Las entradas, salidas y ventas aparecerán aquí." /> : movements.slice(0, 50).map((movement, index) =>
+        {movements.length === 0 ? <EmptyState icon="swap-vertical" title="Sin movimientos" message="Las entradas, salidas y ventas aparecerán aquí." /> : visibleMovements.map((movement, index) =>
           <View key={movement.id} style={[styles.row, index > 0 && styles.border]}>
             <View style={[styles.initial, movement.type === "salida" || movement.type === "venta" ? styles.outIcon : undefined]}><MaterialCommunityIcons name={movement.type === "entrada" ? "arrow-down" : "arrow-up"} size={20} color={movement.type === "entrada" ? colors.success : colors.danger} /></View>
             <View style={styles.details}><Text style={styles.name}>{movement.productName}</Text><Text style={styles.meta}>{shortDate(movement.date)}{movement.note ? ` · ${movement.note}` : ""}</Text></View>
             <View style={styles.movementRight}><Text style={[styles.movementQty, { color: movement.type === "entrada" ? colors.success : colors.danger }]}>{movement.type === "entrada" ? "+" : "-"}{movement.quantity}</Text><Text style={styles.movementType}>{movement.type}</Text></View>
           </View>)}
+        <PaginationControls page={movementPage} total={movements.length} onPageChange={setMovementPage} />
       </Card>}
     </Page>
 

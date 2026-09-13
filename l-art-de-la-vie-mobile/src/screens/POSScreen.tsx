@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Card, EmptyState, Field, Pill, Segmented, Sheet } from "../components/ui";
+import { Button, Card, EmptyState, Field, PaginationControls, Pill, Segmented, Sheet } from "../components/ui";
 import { Page } from "../components/Page";
 import { useStore } from "../context/StoreContext";
 import { colors, money } from "../theme";
@@ -11,7 +11,7 @@ import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
 type Filter = "Todas" | Category;
 
 export function POSScreen() {
-  const { products, categories, cart, cartCount, cartSubtotal, cashOpening, refreshing, refresh, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
+  const { products, cart, cartCount, cartSubtotal, cashOpening, refreshing, refresh, addToCart, removeFromCart, updateCartQuantity, clearCart, completeSale } = useStore();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Filter>("Todas");
   const [cartOpen, setCartOpen] = useState(false);
@@ -20,11 +20,18 @@ export function POSScreen() {
   const [cashReceived, setCashReceived] = useState("");
   const [busy, setBusy] = useState(false);
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
-  const categoryOptions = useMemo(() => [{ value: "Todas", label: "Todas" }, ...categories.map(value => ({ value, label: value }))] as { value: Filter; label: string }[], [categories]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const availableCategories = useMemo(() => Array.from(new Set(products.filter(product => product.stock > 0).map(product => product.category))).sort((a, b) => a.localeCompare(b, "es")), [products]);
+  const categoryOptions = useMemo(() => [{ value: "Todas", label: "Todas" }, ...availableCategories.map(value => ({ value, label: value }))] as { value: Filter; label: string }[], [availableCategories]);
 
   const filtered = useMemo(() => products.filter(product => product.stock > 0
     && (category === "Todas" || product.category === category)
     && (`${product.name} ${product.code}`.toLowerCase().includes(search.trim().toLowerCase()))), [products, search, category]);
+  const visibleProducts = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => { setPage(1); }, [search, category]);
+  useEffect(() => { if (category !== "Todas" && !availableCategories.includes(category)) setCategory("Todas"); }, [availableCategories, category]);
+  useEffect(() => { if ((page - 1) * pageSize >= filtered.length) setPage(Math.max(1, Math.ceil(filtered.length / pageSize))); }, [filtered.length, page]);
   const discountPercent = Math.min(100, Math.max(0, Number(discount) || 0));
   const discountAmount = cartSubtotal * discountPercent / 100;
   const total = cartSubtotal - discountAmount;
@@ -50,9 +57,10 @@ export function POSScreen() {
       <Field value={search} onChangeText={setSearch} placeholder="Buscar nombre o código..." autoCapitalize="none" />
       <Segmented<Filter> values={categoryOptions} value={category} onChange={setCategory} />
       <View style={styles.productGrid}>
-        {filtered.map(product => <ProductCard key={product.id} product={product} onAdd={() => addToCart(product)} onPreview={() => setPreviewProduct(product)} />)}
+        {visibleProducts.map(product => <ProductCard key={product.id} product={product} onAdd={() => addToCart(product)} onPreview={() => setPreviewProduct(product)} />)}
       </View>
       {filtered.length === 0 && <Card style={styles.emptyCard}><EmptyState icon="magnify" title="Sin resultados" message="Prueba con otro nombre o categoría." /></Card>}
+      <PaginationControls page={page} total={filtered.length} onPageChange={setPage} />
       {cartCount > 0 && <Button title={`Ver carrito · ${cartCount} · ${money(cartSubtotal)}`} icon="cart-outline" onPress={() => setCartOpen(true)} style={styles.viewCart} />}
     </Page>
 
@@ -70,7 +78,9 @@ export function POSScreen() {
         <Pressable onPress={() => Alert.alert("Vaciar carrito", "¿Quitar todos los productos?", [{ text: "Cancelar" }, { text: "Vaciar", style: "destructive", onPress: clearCart }])} style={styles.clear}><Text style={styles.clearText}>Vaciar carrito</Text></Pressable>
         <View style={styles.summary}>
           <Summary label="Subtotal" value={money(cartSubtotal)} />
-          <Field label="Descuento (%)" value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" />
+          <Text style={styles.discountLabel}>Descuento rápido</Text>
+          <View style={styles.discountOptions}>{[0, 5, 10, 15].map(value => <Pressable key={value} onPress={() => setDiscount(String(value))} style={[styles.discountOption, discountPercent === value && styles.discountOptionActive]}><Text style={[styles.discountOptionText, discountPercent === value && styles.discountOptionTextActive]}>{value}%</Text></Pressable>)}</View>
+          <Field label="Otro porcentaje" value={discount} onChangeText={value => setDiscount(String(Math.min(100, Math.max(0, Number(value) || 0))))} keyboardType="decimal-pad" />
           {discountAmount > 0 && <Summary label="Descuento" value={`-${money(discountAmount)}`} danger />}
           <Summary label="Total" value={money(total)} total />
         </View>
@@ -121,5 +131,6 @@ const styles = StyleSheet.create({
   quantity: { flexDirection: "row", alignItems: "center", gap: 7 }, qtyButton: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, qtyText: { minWidth: 20, textAlign: "center", color: colors.ink, fontWeight: "900" },
   clear: { alignSelf: "flex-end", paddingVertical: 10 }, clearText: { color: colors.danger, fontSize: 12, fontWeight: "800" },
   summary: { backgroundColor: colors.white, borderRadius: 18, padding: 16, marginVertical: 14 }, summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5 }, summaryLabel: { color: colors.muted, fontSize: 13 }, summaryValue: { color: colors.ink, fontSize: 13, fontWeight: "800" }, summaryTotal: { color: colors.ink, fontSize: 18, fontWeight: "900" },
+  discountLabel: { color: colors.ink, fontSize: 12, fontWeight: "800", marginTop: 10, marginBottom: 8 }, discountOptions: { flexDirection: "row", gap: 7, marginBottom: 10 }, discountOption: { flex: 1, minHeight: 38, borderRadius: 12, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center" }, discountOptionActive: { backgroundColor: colors.forest, borderColor: colors.forest }, discountOptionText: { color: colors.forest, fontSize: 11, fontWeight: "900" }, discountOptionTextActive: { color: colors.white },
   formTitle: { color: colors.ink, fontWeight: "900", fontSize: 15, marginBottom: 10 }, cashField: { marginTop: 16 }, change: { backgroundColor: colors.forestSoft, borderRadius: 14, padding: 13, flexDirection: "row", justifyContent: "space-between" }, changeLabel: { color: colors.forest, fontWeight: "700" }, changeValue: { color: colors.forest, fontWeight: "900", fontSize: 17 },
 });

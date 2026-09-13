@@ -1,8 +1,13 @@
 import type { Session } from "@supabase/supabase-js";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { passwordResetUrl, supabase } from "../lib/supabase";
 import type { AppUser } from "../types";
+
+// Completa el regreso desde el navegador cuando Expo abre Google.
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthValue {
   session: Session | null;
@@ -10,6 +15,7 @@ interface AuthValue {
   loading: boolean;
   canManage: boolean;
   signIn(email: string, password: string): Promise<void>;
+  signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
 }
@@ -75,6 +81,47 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    const redirectTo = AuthSession.makeRedirectUri({ scheme: "lartdelavie", path: "auth/callback" });
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+
+    if (error || !data.url) {
+      throw new Error("No pudimos abrir Google. Revisa la configuración del inicio de sesión.");
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type === "cancel" || result.type === "dismiss") {
+      throw new Error("Inicio de sesión cancelado");
+    }
+    if (result.type !== "success") {
+      throw new Error("No pudimos terminar el inicio de sesión con Google.");
+    }
+
+    const code = new URL(result.url).searchParams.get("code");
+    if (!code) throw new Error("Google no devolvió un código de acceso válido.");
+
+    setLoading(true);
+    const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError || !sessionData.session) {
+      setLoading(false);
+      throw new Error("No pudimos completar tu sesión con Google.");
+    }
+
+    setSession(sessionData.session);
+    try {
+      setUser(await loadUser(sessionData.session));
+    } catch {
+      await supabase.auth.signOut({ scope: "local" });
+      setUser(null);
+      throw new Error("Tu cuenta de Google no está autorizada para entrar al sistema.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut({ scope: "local" });
     setSession(null);
@@ -87,7 +134,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const value = useMemo<AuthValue>(() => ({
-    session, user, loading, signIn, signOut, resetPassword,
+    session, user, loading, signIn, signInWithGoogle, signOut, resetPassword,
     canManage: user?.role === "owner" || user?.role === "admin",
   }), [session, user, loading]);
 

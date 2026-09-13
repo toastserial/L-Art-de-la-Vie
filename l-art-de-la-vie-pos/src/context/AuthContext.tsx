@@ -10,7 +10,9 @@ interface AuthContextValue {
   session: Session | null;
   user: AppUser | null;
   loading: boolean;
+  authError: string;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -42,8 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       setSession(nextSession);
       if (!nextSession) { setUser(null); setLoading(false); return; }
-      try { setUser(await loadUser(nextSession)); }
-      catch { await supabase.auth.signOut(); setUser(null); }
+      try { setUser(await loadUser(nextSession)); setAuthError(""); }
+      catch (reason) {
+        setAuthError(reason instanceof Error ? reason.message : "Tu correo no está autorizado para entrar");
+        await supabase.auth.signOut();
+        setUser(null);
+      }
       finally { if (active) setLoading(false); }
     };
     supabase.auth.getSession().then(({ data }) => syncSession(data.session));
@@ -54,13 +61,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
+    setAuthError(""); setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) { setLoading(false); throw new Error("Correo o contraseña incorrectos"); }
     setSession(data.session);
     try { setUser(await loadUser(data.session)); }
     catch (error) { await supabase.auth.signOut(); throw error; }
     finally { setLoading(false); }
+  };
+
+  const signInWithGoogle = async () => {
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw new Error("No se pudo conectar con Google");
   };
 
   const signOut = async () => { await supabase.auth.signOut(); setSession(null); setUser(null); };
@@ -73,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error("No se pudo actualizar la contraseña");
   };
 
-  return <AuthContext.Provider value={{ session, user, loading, signIn, signOut, resetPassword, updatePassword, canManage: user?.role === "owner" || user?.role === "admin" }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ session, user, loading, authError, signIn, signInWithGoogle, signOut, resetPassword, updatePassword, canManage: user?.role === "owner" || user?.role === "admin" }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

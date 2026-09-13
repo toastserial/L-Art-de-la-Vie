@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/context/StoreContext";
 import { Expense } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DollarSign, CreditCard, ArrowRightLeft, Plus, Wallet, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { ListPagination } from "@/components/ListPagination";
 
 export default function CashClose() {
   const { sales, cashCloses, todayExpenses, cashOpening, closeCash, addExpense, deleteExpense } = useStore();
@@ -23,6 +24,9 @@ export default function CashClose() {
   const [expenseDesc, setExpenseDesc] = useState("");
   const [expenseAmount, setExpenseAmount] = useState(0);
   const [expenseDialog, setExpenseDialog] = useState(false);
+  const [salesPage, setSalesPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const pageSize = 10;
 
   const localDate = (value: string | Date) => new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Tegucigalpa", year: "numeric", month: "2-digit", day: "2-digit"
@@ -39,6 +43,10 @@ export default function CashClose() {
   const openingCash = cashOpening?.openingCash ?? 0;
   const expectedCash = openingCash + byMethod.efectivo - totalExpenses;
   const difference = actualCash - expectedCash;
+  const visibleTodaySales = todaySales.slice((salesPage - 1) * pageSize, salesPage * pageSize);
+  const visibleCloses = cashCloses.slice((historyPage - 1) * pageSize, historyPage * pageSize);
+  useEffect(() => { if ((salesPage - 1) * pageSize >= todaySales.length) setSalesPage(Math.max(1, Math.ceil(todaySales.length / pageSize))); }, [todaySales.length, salesPage]);
+  useEffect(() => { if ((historyPage - 1) * pageSize >= cashCloses.length) setHistoryPage(Math.max(1, Math.ceil(cashCloses.length / pageSize))); }, [cashCloses.length, historyPage]);
 
   const handleAddExpense = async () => {
     if (!expenseDesc || expenseAmount <= 0) { toast({ title: "Datos incompletos", variant: "destructive" }); return; }
@@ -129,8 +137,8 @@ export default function CashClose() {
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {todaySales.map((s) => (
+                  <TableBody key={salesPage} className="list-enter">
+                    {visibleTodaySales.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-mono text-xs">{s.id}</TableCell>
                         <TableCell className="text-sm">{new Date(s.date).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</TableCell>
@@ -143,6 +151,7 @@ export default function CashClose() {
                     )}
                   </TableBody>
                 </Table>
+                <ListPagination page={salesPage} total={todaySales.length} onPageChange={setSalesPage} itemLabel="ventas" />
               </CardContent>
             </Card>
 
@@ -241,8 +250,8 @@ export default function CashClose() {
                     <TableHead className="text-right">Diferencia</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {cashCloses.map((cc) => (
+                <TableBody key={historyPage} className="list-enter">
+                  {visibleCloses.map((cc) => (
                     <TableRow key={cc.id}>
                       <TableCell>{new Date(cc.date).toLocaleDateString("es")}</TableCell>
                       <TableCell className="text-right">L {cc.totalSales.toFixed(2)}</TableCell>
@@ -262,6 +271,7 @@ export default function CashClose() {
                   )}
                 </TableBody>
               </Table>
+              <ListPagination page={historyPage} total={cashCloses.length} onPageChange={setHistoryPage} itemLabel="cierres" />
             </CardContent>
           </Card>
         </TabsContent>

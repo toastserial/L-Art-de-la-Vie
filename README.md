@@ -13,6 +13,10 @@ Documentación detallada de arquitectura, componentes, base de datos, Git y desp
 
 Guía de seguridad, permisos y verificación: [`docs/SECURITY.md`](docs/SECURITY.md).
 
+Configuración de acceso privado con Google: [`docs/GOOGLE_SSO.md`](docs/GOOGLE_SSO.md).
+
+Preparación legal y técnica de factura CAI: [`docs/CAI_HONDURAS.md`](docs/CAI_HONDURAS.md).
+
 ## Configuración inicial
 
 ### 1. Base de datos
@@ -27,10 +31,21 @@ En Supabase → **SQL Editor**, ejecuta en orden los archivos de `l-art-de-la-vi
 6. `202607140001_product_images.sql`
 7. `202607140002_backend_only_access.sql`
 8. `202607140003_user_display_names.sql`
+9. `202607160001_customer_accounts.sql`
+10. `202609080001_dynamic_product_categories.sql`
+11. `202609120001_staff_access_allowlist.sql`
+12. `202609120002_cai_foundation.sql`
 
 ### 2. Primer usuario
 
-En Supabase → **Authentication → Users**, crea el usuario propietario con correo y contraseña. La migración `003` asigna como `owner` al primer usuario existente. Si el usuario se creó después, el trigger hace la misma asignación automáticamente.
+En Supabase → **Authentication → Users**, crea el usuario propietario con correo y contraseña. Luego autoriza ese mismo correo; el trigger enlaza automáticamente la cuenta existente:
+
+```sql
+insert into public.staff_access_allowlist (store_id, email, role)
+values ('00000000-0000-0000-0000-000000000001', 'CORREO-DEL-PROPIETARIO', 'owner');
+```
+
+Si el propietario ya existía antes de ejecutar la migración `202609120001`, su acceso se conserva y se agrega a la lista automáticamente.
 
 No existe registro público en el frontend: es un sistema privado para personal autorizado.
 
@@ -54,6 +69,7 @@ En `l-art-de-la-vie-pos/.env`:
 VITE_API_URL=http://localhost:3000/api
 VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=TU_PUBLISHABLE_KEY
+VITE_GOOGLE_AUTH_ENABLED=true
 ```
 
 La clave publishable/anon puede estar en el navegador. La `service_role` jamás debe colocarse en el frontend.
@@ -72,15 +88,17 @@ En Supabase → **Authentication → URL Configuration** configura:
 - `admin`: inventario, corrección de gastos y cierre de caja.
 - `cashier`: ventas, consulta de inventario y registro de gastos.
 
-Para autorizar otro usuario creado en Supabase Auth:
+El propietario puede administrar los correos desde **POS → Personal**. Para hacerlo manualmente:
 
 ```sql
-insert into public.store_members (store_id, user_id, role)
+insert into public.staff_access_allowlist (store_id, email, role)
 values (
   '00000000-0000-0000-0000-000000000001',
-  'UUID-DEL-USUARIO',
+  'correo@gmail.com',
   'cashier'
-);
+)
+on conflict (store_id, email)
+do update set role = excluded.role, active = true;
 ```
 
 Cambia `cashier` por `admin` cuando corresponda.

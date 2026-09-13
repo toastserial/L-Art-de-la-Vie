@@ -2,6 +2,24 @@
 @source "../src";
 @import "tw-animate-css";
 
+.shipping-marquee {
+  animation: shipping-marquee 32s linear infinite;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+@keyframes shipping-marquee {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipping-marquee {
+    animation: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

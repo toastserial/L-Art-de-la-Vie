@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 import type { ComponentProps, PropsWithChildren, ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 import { colors, shadow } from "../theme";
 
 export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle | ViewStyle[] }>) {
@@ -84,15 +84,17 @@ export function Sheet({ visible, onClose, title, children, footer, full = false 
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
     <View style={styles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={[styles.sheet, full && styles.sheetFull]}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={12}><MaterialCommunityIcons name="close" size={25} color={colors.ink} /></Pressable>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.sheetKeyboard}>
+        <View style={[styles.sheet, full && styles.sheetFull]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={12}><MaterialCommunityIcons name="close" size={25} color={colors.ink} /></Pressable>
+          </View>
+          <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
+          {footer && <View style={styles.sheetFooter}>{footer}</View>}
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
-        {footer && <View style={styles.sheetFooter}>{footer}</View>}
-      </View>
+      </KeyboardAvoidingView>
     </View>
   </Modal>;
 }
@@ -103,6 +105,17 @@ export function Segmented<T extends string>({ values, value, onChange }: { value
       <Text style={[styles.segmentText, value === item.value && styles.segmentTextActive]}>{item.label}</Text>
     </Pressable>)}
   </ScrollView>;
+}
+
+export function PaginationControls({ page, total, onPageChange, pageSize = 10 }: { page: number; total: number; onPageChange(page: number): void; pageSize?: number }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(page, 1), pages);
+  if (total <= pageSize) return null;
+  return <View style={styles.pagination} accessibilityLabel={`Página ${safePage} de ${pages}`}>
+    <Pressable disabled={safePage === 1} onPress={() => onPageChange(safePage - 1)} style={({ pressed }) => [styles.pageButton, (pressed || safePage === 1) && styles.pageButtonMuted]}><MaterialCommunityIcons name="chevron-left" size={20} color={colors.forest} /><Text style={styles.pageButtonText}>Anterior</Text></Pressable>
+    <Text style={styles.pageCount}>{safePage} / {pages}</Text>
+    <Pressable disabled={safePage === pages} onPress={() => onPageChange(safePage + 1)} style={({ pressed }) => [styles.pageButton, (pressed || safePage === pages) && styles.pageButtonMuted]}><Text style={styles.pageButtonText}>Siguiente</Text><MaterialCommunityIcons name="chevron-right" size={20} color={colors.forest} /></Pressable>
+  </View>;
 }
 
 const styles = StyleSheet.create({
@@ -123,6 +136,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.ink },
   emptyMessage: { marginTop: 5, color: colors.muted, textAlign: "center", lineHeight: 19 },
   overlay: { flex: 1, backgroundColor: "rgba(10,24,16,0.45)", justifyContent: "flex-end" },
+  sheetKeyboard: { width: "100%" },
   sheet: { maxHeight: "88%", minHeight: 220, backgroundColor: colors.cream, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden" },
   sheetFull: { maxHeight: "96%", height: "96%" },
   sheetHandle: { width: 42, height: 5, borderRadius: 3, backgroundColor: "#CBD0CC", alignSelf: "center", marginTop: 10 },
@@ -135,4 +149,9 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.forest, borderColor: colors.forest },
   segmentText: { fontSize: 13, fontWeight: "700", color: colors.muted },
   segmentTextActive: { color: colors.white },
+  pagination: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  pageButton: { minHeight: 42, flexDirection: "row", alignItems: "center", gap: 2, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, paddingHorizontal: 11 },
+  pageButtonMuted: { opacity: 0.38 },
+  pageButtonText: { color: colors.forest, fontSize: 11, fontWeight: "800" },
+  pageCount: { color: colors.muted, fontSize: 11, fontWeight: "800" },
 });

@@ -9,16 +9,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const { user, loading, signIn, resetPassword } = useAuth();
+  const { user, loading, authError, signIn, signInWithGoogle, resetPassword } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetting, setResetting] = useState(false);
+  const googleAuthEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED !== "false";
 
   if (!loading && user) return <Navigate to="/" replace />;
 
@@ -41,11 +43,17 @@ export default function Login() {
     } finally { setResetting(false); }
   };
 
+  const handleGoogle = async () => {
+    setError(""); setGoogleSubmitting(true);
+    try { await signInWithGoogle(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo conectar con Google"); setGoogleSubmitting(false); }
+  };
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#f1efe7] lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(440px,0.92fr)] lg:p-4">
       <section className="relative min-h-[250px] overflow-hidden bg-primary lg:min-h-[calc(100vh-2rem)] lg:rounded-[2rem]">
         <img src="/login-boutique.jpg" alt="Vela decorativa de L'Art de la Vie" className="absolute inset-0 h-full w-full object-cover object-[center_58%] lg:object-center" />
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/25 via-primary/10 to-primary/95 lg:bg-gradient-to-r lg:from-primary/20 lg:via-primary/30 lg:to-primary/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-primary/55 to-primary/95 lg:bg-gradient-to-r lg:from-primary/45 lg:via-primary/60 lg:to-primary/90" />
         <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_10%,rgba(255,255,255,.45),transparent_24%)]" />
 
         <div className="relative flex h-full min-h-[250px] flex-col justify-between p-5 text-primary-foreground sm:p-8 lg:min-h-[calc(100vh-2rem)] lg:p-12 xl:p-16">
@@ -60,15 +68,11 @@ export default function Login() {
           </div>
 
           <div className="hidden max-w-2xl lg:block">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
-              <Sparkles className="h-3.5 w-3.5 text-accent" /> El arte de vivir
-            </div>
             <h1 className="max-w-xl font-display text-5xl leading-[1.04] xl:text-7xl">Tu boutique, organizada con intención.</h1>
-            <p className="mt-6 max-w-lg text-base leading-7 text-white/75 xl:text-lg">Ventas, inventario y caja reunidos en un espacio creado para trabajar con claridad.</p>
+            <p className="mt-6 max-w-lg text-base font-medium leading-7 text-white/90 [text-shadow:0_1px_12px_rgba(0,0,0,.35)] xl:text-lg">Ventas, inventario y caja reunidos en un espacio creado para trabajar con claridad.</p>
           </div>
 
           <div className="hidden items-center justify-between gap-4 text-xs text-white/65 lg:flex">
-            <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-accent" /> Acceso privado y protegido</span>
             <span>Siguatepeque · Honduras</span>
           </div>
         </div>
@@ -98,7 +102,15 @@ export default function Login() {
             <Button type="submit" className="group h-14 w-full rounded-2xl text-sm font-semibold shadow-[0_18px_35px_-18px_rgba(4,61,15,.8)]" disabled={submitting || loading}>{(submitting || loading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4 transition-transform group-hover:translate-x-1" />}Entrar al sistema</Button>
           </form>
 
-          <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5 text-primary/60" /> Solo personal autorizado</div>
+          {googleAuthEnabled && <>
+            <div className="my-5 flex items-center gap-3" aria-hidden><span className="h-px flex-1 bg-border" /><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">o continúa con</span><span className="h-px flex-1 bg-border" /></div>
+            <Button type="button" variant="outline" onClick={handleGoogle} disabled={googleSubmitting || loading} className="h-14 w-full rounded-2xl border-black/10 bg-white text-foreground shadow-sm hover:bg-white hover:shadow-md">
+              {googleSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleMark />}
+              Entrar con Google
+            </Button>
+          </>}
+
+          {authError && !error && <div role="alert" className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">{authError}</div>}
         </div>
       </section>
 
@@ -107,4 +119,8 @@ export default function Login() {
       </Dialog>
     </main>
   );
+}
+
+function GoogleMark() {
+  return <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.5-.2-2.2H12v4.3h5.4a4.6 4.6 0 0 1-2 3v2.8h3.3c1.9-1.8 2.9-4.5 2.9-7.9Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.3-2.8c-.9.6-2.1 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3v2.9A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.7A6 6 0 0 1 6.1 12c0-.6.1-1.2.3-1.7V7.4H3A10 10 0 0 0 2 12c0 1.7.4 3.2 1 4.6l3.4-2.9Z"/><path fill="#EA4335" d="M12 6.2c1.5 0 2.8.5 3.9 1.5l2.9-2.9A9.8 9.8 0 0 0 3 7.4l3.4 2.9c.8-2.3 3-4.1 5.6-4.1Z"/></svg>;
 }

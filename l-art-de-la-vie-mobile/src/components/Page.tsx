@@ -11,6 +11,8 @@ export function Page({ title, subtitle, action, children, refreshing, onRefresh 
     showsVerticalScrollIndicator={false}
     refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.forest} /> : undefined}
     keyboardShouldPersistTaps="handled"
+    keyboardDismissMode="interactive"
+    automaticallyAdjustKeyboardInsets
   >
     <View style={styles.header}>
       <View style={styles.headerText}>

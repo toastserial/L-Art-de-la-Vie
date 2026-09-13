@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ShoppingBag, Menu } from "lucide-react";
+import { ShoppingBag, Menu, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/shared/Logo";
 import { useCart } from "@/hooks/useCart";
@@ -15,6 +15,13 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { count, open } = useCart();
+  const focusSearch = () => {
+    document.querySelector("#coleccion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(
+      () => document.querySelector<HTMLInputElement>("#catalog-search")?.focus(),
+      450,
+    );
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -65,6 +72,14 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={focusSearch}
+              aria-label="Buscar productos"
+              className="inline-grid min-h-11 min-w-11 place-items-center rounded-full text-[color:var(--forest)] transition hover:bg-[color:var(--cream)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--gold)]"
+            >
+              <Search className="h-4.5 w-4.5" />
+            </button>
             <button
               type="button"
               onClick={open}

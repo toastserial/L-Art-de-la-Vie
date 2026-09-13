@@ -1,4 +1,4 @@
-import { LayoutDashboard, LogOut, Package, ShoppingCart, Wallet } from "lucide-react";
+import { FileText, LayoutDashboard, LogOut, Package, ShoppingCart, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -18,6 +18,8 @@ const navItems = [
   { title: "Inventario", url: "/inventario", icon: Package },
   { title: "Punto de Venta", url: "/pos", icon: ShoppingCart },
   { title: "Cierre de Caja", url: "/cierre", icon: Wallet },
+  { title: "Facturación CAI", url: "/facturacion", icon: FileText, manageOnly: true },
+  { title: "Personal", url: "/personal", icon: Users, ownerOnly: true },
 ];
 
 export function AppSidebar() {
@@ -40,7 +42,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {navItems.filter((item) => (!item.manageOnly || user?.role === "owner" || user?.role === "admin") && (!item.ownerOnly || user?.role === "owner")).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="h-11">
                     <NavLink

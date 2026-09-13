@@ -52,6 +52,32 @@ const productValues = (body) => {
   };
 };
 const categoryName = (value) => text(value, "Categoría", 60).replace(/\s+/g, " ");
+const staffRoles = ["owner", "admin", "cashier"];
+const staffEmail = (value) => {
+  const email = text(value, "Correo", 160).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, "El correo no es válido");
+  return email;
+};
+const fiscalText = (value, field, maxLength) => value === undefined || value === null || String(value).trim() === "" ? null : text(value, field, maxLength);
+const fiscalCode = (value, field, length) => {
+  const code = text(value, field, length);
+  if (!new RegExp(`^[0-9]{${length}}$`).test(code)) throw httpError(400, `${field} debe tener ${length} dígitos`);
+  return code;
+};
+const fiscalCai = (value) => {
+  const cai = fiscalText(value, "CAI", 37)?.toUpperCase() ?? null;
+  if (cai && !/^[A-Z0-9]{6}(?:-[A-Z0-9]{6}){4}-[A-Z0-9]{2}$/.test(cai)) {
+    throw httpError(400, "El CAI debe tener el formato oficial de 37 caracteres");
+  }
+  return cai;
+};
+const fiscalDate = (value, field) => {
+  if (value === undefined || value === null || value === "") return null;
+  const date = String(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw httpError(400, `${field} no es válida`);
+  return date;
+};
+const fiscalNumber = (value, field) => value === undefined || value === null || value === "" ? null : integer(value, field, 1, 99_999_999);
 const ensureCategory = async (name) => {
   const category = unwrap(await supabase.from("product_categories")
     .select("name").eq("store_id", storeId).eq("name", name).eq("active", true).maybeSingle());
@@ -256,6 +282,104 @@ export function createApp() {
         id: todayClose.id, date: todayClose.business_date, openingCash: Number(todayClose.opening_cash), openedAt: todayClose.created_at
       } : null
     });
+  }));
+
+  app.get("/api/fiscal-settings", requireRole("owner", "admin"), asyncRoute(async (_req, res) => {
+    const settings = unwrap(await supabase.from("fiscal_settings").select("*").eq("store_id", storeId).maybeSingle());
+    if (!settings) return res.json({
+      legalName: "", tradeName: "L'Art de la Vie", rtn: "", address: "", phone: "", email: "", cai: "",
+      establishmentCode: "000", emissionPointCode: "001", documentTypeCode: "01",
+      rangeStart: null, rangeEnd: null, nextNumber: null, authorizationDate: "", deadlineDate: "", enabled: false
+    });
+    res.json({
+      legalName: settings.legal_name ?? "", tradeName: settings.trade_name ?? "", rtn: settings.rtn ?? "",
+      address: settings.address ?? "", phone: settings.phone ?? "", email: settings.email ?? "", cai: settings.cai ?? "",
+      establishmentCode: settings.establishment_code, emissionPointCode: settings.emission_point_code,
+      documentTypeCode: settings.document_type_code, rangeStart: settings.range_start, rangeEnd: settings.range_end,
+      nextNumber: settings.next_number, authorizationDate: settings.authorization_date ?? "",
+      deadlineDate: settings.deadline_date ?? "", enabled: settings.enabled,
+      remaining: settings.range_end && settings.next_number ? Math.max(0, Number(settings.range_end) - Number(settings.next_number) + 1) : null
+    });
+  }));
+
+  app.put("/api/fiscal-settings", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
+    const enabled = req.body.enabled === true;
+    const values = {
+      store_id: storeId,
+      legal_name: fiscalText(req.body.legalName, "Razón social", 180),
+      trade_name: fiscalText(req.body.tradeName, "Nombre comercial", 180),
+      rtn: fiscalText(req.body.rtn, "RTN", 14),
+      address: fiscalText(req.body.address, "Dirección", 300),
+      phone: fiscalText(req.body.phone, "Teléfono", 30),
+      email: fiscalText(req.body.email, "Correo", 160),
+      cai: fiscalCai(req.body.cai),
+      establishment_code: fiscalCode(req.body.establishmentCode ?? "000", "Código de establecimiento", 3),
+      emission_point_code: fiscalCode(req.body.emissionPointCode ?? "001", "Punto de emisión", 3),
+      document_type_code: fiscalCode(req.body.documentTypeCode ?? "01", "Tipo de documento", 2),
+      range_start: fiscalNumber(req.body.rangeStart, "Inicio de rango"),
+      range_end: fiscalNumber(req.body.rangeEnd, "Fin de rango"),
+      next_number: fiscalNumber(req.body.nextNumber, "Siguiente correlativo"),
+      authorization_date: fiscalDate(req.body.authorizationDate, "Fecha de autorización"),
+      deadline_date: fiscalDate(req.body.deadlineDate, "Fecha límite de emisión"),
+      enabled
+    };
+    if (values.rtn && !/^[0-9]{14}$/.test(values.rtn)) throw httpError(400, "El RTN debe tener exactamente 14 dígitos");
+    if (enabled) {
+      const required = [values.legal_name, values.rtn, values.address, values.cai, values.range_start, values.range_end, values.next_number, values.authorization_date, values.deadline_date];
+      if (required.some((value) => value === null)) throw httpError(400, "Completa todos los datos obligatorios antes de activar CAI");
+      if (values.range_end < values.range_start || values.next_number < values.range_start || values.next_number > values.range_end) throw httpError(400, "El rango o siguiente correlativo no es válido");
+      if (values.deadline_date < new Date().toISOString().slice(0, 10)) throw httpError(400, "El CAI ya superó su fecha límite de emisión");
+    }
+    unwrap(await supabase.from("fiscal_settings").upsert(values, { onConflict: "store_id" }));
+    res.json({ saved: true, enabled });
+  }));
+
+  app.get("/api/staff-access", requireRole("owner"), asyncRoute(async (_req, res) => {
+    const rows = unwrap(await supabase.from("staff_access_allowlist")
+      .select("id,email,role,active,created_at")
+      .eq("store_id", storeId)
+      .eq("active", true)
+      .order("email")
+      .limit(200));
+    res.json(rows.map((row) => ({
+      id: row.id, email: row.email, role: row.role, active: row.active, createdAt: row.created_at
+    })));
+  }));
+
+  app.post("/api/staff-access", requireRole("owner"), asyncRoute(async (req, res) => {
+    const role = String(req.body.role ?? "cashier");
+    if (!staffRoles.includes(role)) throw httpError(400, "El rol no es válido");
+    const row = unwrap(await supabase.from("staff_access_allowlist").upsert({
+      store_id: storeId, email: staffEmail(req.body.email), role, active: true
+    }, { onConflict: "store_id,email" }).select("id,email,role,active,created_at").single());
+    res.status(201).json({ id: row.id, email: row.email, role: row.role, active: row.active, createdAt: row.created_at });
+  }));
+
+  app.delete("/api/staff-access/:id", requireRole("owner"), asyncRoute(async (req, res) => {
+    const accessId = uuid(req.params.id, "Acceso");
+    const access = unwrap(await supabase.from("staff_access_allowlist")
+      .select("email,role,active").eq("store_id", storeId).eq("id", accessId).single());
+    if (access.email === req.auth.email.toLowerCase()) throw httpError(400, "No puedes retirar tu propio acceso");
+    unwrap(await supabase.from("staff_access_allowlist").delete()
+      .eq("store_id", storeId).eq("id", accessId).select("id").single());
+    res.status(204).end();
+  }));
+
+  app.put("/api/staff-access/:id", requireRole("owner"), asyncRoute(async (req, res) => {
+    const accessId = uuid(req.params.id, "Acceso");
+    const role = String(req.body.role ?? "");
+    if (!staffRoles.includes(role)) throw httpError(400, "El rol no es válido");
+    const access = unwrap(await supabase.from("staff_access_allowlist")
+      .select("email,role,active").eq("store_id", storeId).eq("id", accessId).single());
+    if (access.email === req.auth.email.toLowerCase()) throw httpError(400, "No puedes cambiar tu propio rol");
+    if (access.active && access.role === "owner" && role !== "owner") {
+      const owners = unwrap(await supabase.from("staff_access_allowlist").select("id")
+        .eq("store_id", storeId).eq("role", "owner").eq("active", true));
+      if (owners.length <= 1) throw httpError(400, "La tienda debe conservar al menos un propietario");
+    }
+    const updated = unwrap(await supabase.from("staff_access_allowlist").update({ role })
+      .eq("store_id", storeId).eq("id", accessId).select("id,email,role,active,created_at").single());
+    res.json({ id: updated.id, email: updated.email, role: updated.role, active: updated.active, createdAt: updated.created_at });
   }));
 
   app.post("/api/cash-openings", asyncRoute(async (req, res) => {

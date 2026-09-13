@@ -13,6 +13,8 @@ import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import POS from "./pages/POS";
 import CashClose from "./pages/CashClose";
+import FiscalSettings from "./pages/FiscalSettings";
+import StaffAccess from "./pages/StaffAccess";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -33,7 +35,7 @@ function ProtectedApp() {
   const { user, loading } = useAuth();
   if (loading) return <SessionLoading />;
   if (!user) return <Navigate to="/login" replace />;
-  return <StoreProvider><StoreGate><AppLayout><Routes><Route path="/" element={<Dashboard />} /><Route path="/inventario" element={<Inventory />} /><Route path="/pos" element={<POS />} /><Route path="/cierre" element={<CashClose />} /><Route path="*" element={<NotFound />} /></Routes></AppLayout></StoreGate></StoreProvider>;
+  return <StoreProvider><StoreGate><AppLayout><Routes><Route path="/" element={<Dashboard />} /><Route path="/inventario" element={<Inventory />} /><Route path="/pos" element={<POS />} /><Route path="/cierre" element={<CashClose />} /><Route path="/facturacion" element={<FiscalSettings />} /><Route path="/personal" element={<StaffAccess />} /><Route path="*" element={<NotFound />} /></Routes></AppLayout></StoreGate></StoreProvider>;
 }
 
 export default function App() {
