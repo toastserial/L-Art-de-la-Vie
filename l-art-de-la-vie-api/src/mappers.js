@@ -1,6 +1,6 @@
 export const productFromDb = (row) => ({
   id: row.id, code: row.code, name: row.name, category: row.category,
-  price: Number(row.price), stock: row.stock, minStock: row.min_stock,
+  price: Number(row.price), discountPercent: Number(row.discount_percent ?? 0), stock: row.stock, minStock: row.min_stock,
   ...(row.image_url ? { image: row.image_url } : {})
 });
 

@@ -10,26 +10,38 @@ export interface CheckoutInfo {
   note?: string;
 }
 
+/**
+ * WhatsApp only accepts a prefilled text message through wa.me; it cannot
+ * attach files automatically, so the order keeps to its useful details.
+ */
 export function buildOrderMessage(items: CartItem[], info: CheckoutInfo): string {
-  const lines = items.map(
-    (it) => `• ${it.quantity} x ${it.name} — ${formatL(it.price * it.quantity)}`,
+  const productLines = items.map(
+    (item) => `• ${item.quantity} × ${item.name} — ${formatL(item.price * item.quantity)}`,
   );
-  const total = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const delivery = info.delivery === "pickup" ? "Recoger en tienda" : "Envío a Honduras";
+
   const parts = [
-    "Hola, L’Art de la Vie 🌿 Quiero confirmar este pedido:",
+    "Hola 👋 Me gustaría confirmar este pedido de L'Art de la Vie.",
     "",
-    ...lines,
+    "*PRODUCTOS*",
+    ...productLines,
     "",
-    `Total: ${formatL(total)}`,
-    `Cliente: ${info.name}`,
+    "*RESUMEN*",
+    `Total de productos: ${formatL(total)}`,
+    `Entrega: ${delivery}`,
+    "",
+    "*DATOS DE CONTACTO*",
+    `Nombre: ${info.name}`,
     `Teléfono: ${info.phone}`,
-    `Entrega: ${info.delivery === "pickup" ? "Recoger en tienda" : "Envío nacional"}`,
   ];
-  if (info.delivery === "shipping" && info.address) {
-    parts.push(`Dirección: ${info.address}`);
-  }
+
+  if (info.delivery === "shipping" && info.address) parts.push(`Dirección: ${info.address}`);
   if (info.note) parts.push(`Nota: ${info.note}`);
-  parts.push("", "Entiendo que la disponibilidad y el pago serán confirmados por la tienda.");
+  parts.push(
+    "",
+    "Por favor, confirmen disponibilidad, costo de envío y formas de pago. ¡Gracias!",
+  );
   return parts.join("\n");
 }
 
@@ -40,6 +52,8 @@ export function whatsappUrl(message: string): string {
 
 export function whatsappHelloUrl(): string {
   const num = config.whatsappNumber.replace(/[^\d]/g, "");
-  const msg = encodeURIComponent("Hola, L’Art de la Vie 🌿 me gustaría más información.");
+  const msg = encodeURIComponent(
+    "Hola 👋 Me gustaría recibir asesoría sobre los productos de L'Art de la Vie. ¿Podrían ayudarme con disponibilidad, envíos y formas de pago?",
+  );
   return `https://wa.me/${num}?text=${msg}`;
 }

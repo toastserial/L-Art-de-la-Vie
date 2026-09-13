@@ -3,7 +3,7 @@ export type PaymentMethod = "efectivo" | "tarjeta" | "transferencia";
 export type StoreRole = "owner" | "admin" | "cashier";
 
 export interface AppUser { id: string; email: string; fullName: string; role: StoreRole }
-export interface Product { id: string; code: string; name: string; category: Category; price: number; stock: number; minStock: number; image?: string }
+export interface Product { id: string; code: string; name: string; category: Category; price: number; discountPercent: number; stock: number; minStock: number; image?: string }
 export interface CartItem { product: Product; quantity: number }
 export interface SaleItem { productId: string; productName: string; quantity: number; unitPrice: number; subtotal: number }
 export interface Sale { id: string; date: string; items: SaleItem[]; subtotal: number; discount: number; total: number; paymentMethod: PaymentMethod; cashReceived?: number; change?: number }

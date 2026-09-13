@@ -502,6 +502,7 @@ components:
         name: { type: string, example: Vela aromática }
         category: { type: string, minLength: 1, maxLength: 60, example: Decoración }
         price: { type: number, format: double, minimum: 0, example: 250 }
+        discountPercent: { type: number, minimum: 0, maximum: 100, example: 15, description: Porcentaje de oferta para la tienda web }
         stock: { type: integer, minimum: 0, example: 10 }
         minStock: { type: integer, minimum: 0, example: 3 }
         image: { type: string, format: uri }
@@ -513,6 +514,8 @@ components:
         name: { type: string }
         category: { type: string, example: Decoración }
         price: { type: number, format: double }
+        originalPrice: { type: number, format: double, description: Precio regular antes de la oferta }
+        discountPercent: { type: number, minimum: 0, maximum: 100 }
         stock: { type: integer, minimum: 0 }
         image: { type: string, format: uri }
     Product:

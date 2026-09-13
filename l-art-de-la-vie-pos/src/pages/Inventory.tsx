@@ -19,7 +19,7 @@ import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
 import { ListPagination } from "@/components/ListPagination";
 
 type ProductForm = Omit<Product, "id" | "code">;
-const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, stock: 0, minStock: 3 };
+const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, discountPercent: 0, stock: 0, minStock: 3 };
 
 export default function Inventory() {
   const { products, categories, movements, addProduct, updateProduct, deleteProduct, addMovement, addCategory } = useStore();
@@ -61,7 +61,7 @@ export default function Inventory() {
     setEditingProduct(null); setImageFile(null); setImagePreview(undefined);
     setForm({ ...emptyProduct, category: categories[0] }); setDialogOpen(true);
   };
-  const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, stock: p.stock, minStock: p.minStock, image: p.image }); setDialogOpen(true); };
+  const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, discountPercent: p.discountPercent, stock: p.stock, minStock: p.minStock, image: p.image }); setDialogOpen(true); };
 
   const handleImage = (file?: File) => {
     if (!file) return;
@@ -176,7 +176,7 @@ export default function Inventory() {
                         </div>
                       </TableCell>
                       <TableCell><Badge variant="secondary">{p.category}</Badge></TableCell>
-                      <TableCell className="text-right">L {p.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right"><div className="font-medium">L {p.price.toFixed(2)}</div>{p.discountPercent > 0 && <div className="mt-1 text-xs font-semibold text-primary">Oferta web: -{p.discountPercent}%</div>}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant={p.stock <= p.minStock ? "destructive" : "secondary"}>
                           {p.stock}
@@ -288,11 +288,13 @@ export default function Inventory() {
             </div>
             {!editingProduct && <p className="text-xs text-muted-foreground">El código se asignará automáticamente al guardar.</p>}
             <div><Label>Nombre</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div><Label>Precio</Label><Input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></div>
+              <div><Label>Descuento (%)</Label><Input type="number" min={0} max={100} value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} /></div>
               <div><Label>Stock</Label><Input type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
               <div><Label>Stock Mín.</Label><Input type="number" min={0} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} /></div>
             </div>
+            {form.discountPercent > 0 && <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary"><span className="font-semibold">Vista previa en tienda:</span> L {(form.price * (1 - form.discountPercent / 100)).toFixed(2)} <span className="text-muted-foreground line-through">antes L {form.price.toFixed(2)}</span></div>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

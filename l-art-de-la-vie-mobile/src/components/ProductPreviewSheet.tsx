@@ -35,7 +35,7 @@ export function ProductPreviewSheet({ product, onClose, primaryLabel, primaryIco
 
       <Text style={styles.code}>CÓDIGO {product.code}</Text>
       <Text style={styles.name}>{product.name}</Text>
-      <Text style={styles.price}>{money(product.price)}</Text>
+      <View style={styles.priceRow}><Text style={styles.price}>{money(product.price)}</Text>{product.discountPercent > 0 && <View style={styles.offer}><Text style={styles.offerText}>Oferta web -{product.discountPercent}%</Text></View>}</View>
 
       <View style={[styles.stockCard, low && styles.stockCardLow]}>
         <View style={[styles.stockIcon, low && styles.stockIconLow]}>
@@ -60,7 +60,10 @@ const styles = StyleSheet.create({
   categoryText: { color: colors.forest, fontSize: 10, fontWeight: "900", letterSpacing: 0.7 },
   code: { color: colors.gold, fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
   name: { color: colors.ink, fontFamily: "serif", fontSize: 28, lineHeight: 34, fontWeight: "700", marginTop: 6 },
-  price: { color: colors.forest, fontSize: 24, fontWeight: "900", marginTop: 9 },
+  priceRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 9, marginTop: 9 },
+  price: { color: colors.forest, fontSize: 24, fontWeight: "900" },
+  offer: { borderRadius: 999, backgroundColor: colors.forest, paddingHorizontal: 9, paddingVertical: 5 },
+  offerText: { color: colors.white, fontSize: 9, fontWeight: "900" },
   stockCard: { flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, borderRadius: 18, padding: 13, marginTop: 22 },
   stockCardLow: { backgroundColor: colors.dangerSoft },
   stockIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: colors.white },

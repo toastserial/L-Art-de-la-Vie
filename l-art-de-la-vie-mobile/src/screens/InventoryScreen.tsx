@@ -13,9 +13,9 @@ import type { Category, Product } from "../types";
 import { ImageCropper, type CropSource, type CroppedImage } from "../components/ImageCropper";
 import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
 
-interface ProductForm { name: string; category: Category; price: string; stock: string; minStock: string; image?: string }
+interface ProductForm { name: string; category: Category; price: string; discountPercent: string; stock: string; minStock: string; image?: string }
 interface PendingImage { uri: string; width: number; height: number; mimeType?: string | null; fileName?: string | null }
-const blank: ProductForm = { name: "", category: "Decoración", price: "", stock: "", minStock: "3" };
+const blank: ProductForm = { name: "", category: "Decoración", price: "", discountPercent: "0", stock: "", minStock: "3" };
 
 export function InventoryScreen() {
   const { canManage } = useAuth();
@@ -53,7 +53,7 @@ export function InventoryScreen() {
     if (!firstCategory) { setCategoryOpen(true); return; }
     setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
   };
-  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ name: product.name, category: product.category, price: String(product.price), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
+  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
@@ -111,14 +111,14 @@ export function InventoryScreen() {
   ]);
 
   const saveProduct = async () => {
-    const price = Number(form.price), stock = Number(form.stock), minStock = Number(form.minStock);
+    const price = Number(form.price), discountPercent = Number(form.discountPercent), stock = Number(form.stock), minStock = Number(form.minStock);
     if (!form.name.trim()) return Alert.alert("Falta el nombre", "Escribe el nombre del producto.");
-    if (price < 0 || !Number.isFinite(price) || !Number.isInteger(stock) || stock < 0 || !Number.isInteger(minStock) || minStock < 0) return Alert.alert("Datos inválidos", "Revisa precio y cantidades.");
+    if (price < 0 || !Number.isFinite(price) || discountPercent < 0 || discountPercent > 100 || !Number.isFinite(discountPercent) || !Number.isInteger(stock) || stock < 0 || !Number.isInteger(minStock) || minStock < 0) return Alert.alert("Datos inválidos", "Revisa precio, oferta y cantidades.");
     setBusy(true);
     try {
       let image = form.image;
       if (pendingImage) image = (await uploadProductImage(pendingImage.uri, pendingImage.mimeType, pendingImage.fileName)).url;
-      const values = { name: form.name.trim(), category: form.category, price, stock, minStock, image };
+      const values = { name: form.name.trim(), category: form.category, price, discountPercent, stock, minStock, image };
       if (editing) await updateProduct({ ...editing, ...values }); else await addProduct(values);
       setProductOpen(false);
     } catch (reason) { Alert.alert("No se guardó", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
@@ -192,6 +192,7 @@ export function InventoryScreen() {
       <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
       <View style={styles.fieldSpacer} />
       <Field label="Precio" value={form.price} onChangeText={price => setForm(current => ({ ...current, price }))} keyboardType="decimal-pad" placeholder="0.00" />
+      <Field label="Oferta tienda web (%)" value={form.discountPercent} onChangeText={discountPercent => setForm(current => ({ ...current, discountPercent }))} keyboardType="decimal-pad" placeholder="0" /><Text style={styles.offerHelp}>El descuento se muestra en la tienda web; el precio de caja no cambia.</Text>
       <View style={styles.twoFields}><View style={styles.half}><Field label="Existencias" value={form.stock} onChangeText={stock => setForm(current => ({ ...current, stock }))} keyboardType="number-pad" placeholder="0" /></View><View style={styles.half}><Field label="Stock mínimo" value={form.minStock} onChangeText={minStock => setForm(current => ({ ...current, minStock }))} keyboardType="number-pad" placeholder="3" /></View></View>
     </Sheet>
 
@@ -218,6 +219,7 @@ export function InventoryScreen() {
 const styles = StyleSheet.create({
   addButton: { width: 47, height: 47, borderRadius: 16, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" }, search: { marginTop: 16 }, list: { padding: 4 }, movements: { marginTop: 16 },
   categoryButton: { alignSelf: "flex-start", marginTop: 10 }, categoryHelp: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 10 },
+  offerHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: -9, marginBottom: 14 },
   row: { minHeight: 84, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 10 }, border: { borderTopWidth: 1, borderTopColor: colors.line },
   initial: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, outIcon: { backgroundColor: colors.dangerSoft }, initialText: { color: colors.forest, fontSize: 18, fontWeight: "900" },
   productThumb: { width: 48, height: 48, borderRadius: 15, backgroundColor: colors.forestSoft },

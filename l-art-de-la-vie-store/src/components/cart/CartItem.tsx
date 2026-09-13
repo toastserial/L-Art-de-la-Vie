@@ -25,7 +25,7 @@ export function CartItem({ item }: { item: CartItemT }) {
             <h3 className="mt-0.5 truncate font-serif text-base text-[color:var(--ink)]">
               {item.name}
             </h3>
-            <p className="mt-1 text-sm text-[color:var(--ink-muted)]">{formatL(item.price)}</p>
+            <div className="mt-1 flex flex-wrap items-baseline gap-2"><span className="text-sm font-medium text-[color:var(--forest)]">{formatL(item.price)}</span>{item.originalPrice ? <span className="text-xs text-[color:var(--ink-muted)] line-through">{formatL(item.originalPrice)}</span> : null}</div>
           </div>
           <button
             type="button"

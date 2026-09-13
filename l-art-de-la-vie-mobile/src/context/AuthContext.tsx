@@ -82,7 +82,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const signInWithGoogle = async () => {
-    const redirectTo = AuthSession.makeRedirectUri({ scheme: "lartdelavie", path: "auth/callback" });
+    // `native` evita que un entorno de desarrollo sustituya el retorno del
+    // APK por una URL web/exp://. Debe coincidir con app.json y con la URL
+    // adicional autorizada en Supabase: lartdelavie://**.
+    const redirectTo = AuthSession.makeRedirectUri({
+      native: "lartdelavie://auth/callback",
+      scheme: "lartdelavie",
+      path: "auth/callback",
+    });
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo, skipBrowserRedirect: true },

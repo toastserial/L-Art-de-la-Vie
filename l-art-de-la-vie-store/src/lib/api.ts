@@ -11,6 +11,8 @@ function normalize(raw: unknown): Product | null {
   const id = typeof r.id === "string" ? r.id : null;
   const name = typeof r.name === "string" ? r.name : null;
   const price = typeof r.price === "number" ? r.price : Number(r.price);
+  const originalPrice = typeof r.originalPrice === "number" ? r.originalPrice : Number(r.originalPrice);
+  const discountPercent = typeof r.discountPercent === "number" ? r.discountPercent : Number(r.discountPercent);
   const stock = typeof r.stock === "number" ? r.stock : Number(r.stock);
   const image = typeof r.image === "string" ? r.image : null;
   const category = isValidCategory(r.category) ? r.category : "Varios";
@@ -21,6 +23,8 @@ function normalize(raw: unknown): Product | null {
     id,
     name,
     price,
+    ...(Number.isFinite(originalPrice) && originalPrice > price ? { originalPrice } : {}),
+    discountPercent: Number.isFinite(discountPercent) ? Math.min(100, Math.max(0, discountPercent)) : 0,
     stock: Math.max(0, Math.floor(stock)),
     image: image ?? "",
     category,

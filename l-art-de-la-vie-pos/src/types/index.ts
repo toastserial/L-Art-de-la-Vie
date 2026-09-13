@@ -6,6 +6,7 @@ export interface Product {
   name: string;
   category: Category;
   price: number;
+  discountPercent: number;
   stock: number;
   minStock: number;
   image?: string;

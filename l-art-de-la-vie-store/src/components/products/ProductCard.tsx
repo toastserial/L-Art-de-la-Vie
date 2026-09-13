@@ -39,6 +39,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           <span className="rounded-full bg-[color:var(--paper)]/90 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[color:var(--forest)]">
             {product.category}
           </span>
+          {product.discountPercent > 0 ? <span className="w-fit rounded-full bg-[color:var(--forest)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--cream)]">Oferta · -{product.discountPercent}%</span> : null}
         </div>
         {soldOut ? (
           <div className="absolute inset-x-3 bottom-3 rounded-md bg-[color:var(--ink)]/80 px-3 py-1.5 text-center text-xs font-medium uppercase tracking-[0.24em] text-[color:var(--cream)]">
@@ -55,9 +56,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
       <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate font-serif text-lg text-[color:var(--ink)]">{product.name}</h3>
-          <p className="mt-1 text-sm text-[color:var(--ink-muted)]">
-            {soldOut ? "Sin existencias" : formatL(product.price)}
-          </p>
+          {soldOut ? <p className="mt-1 text-sm text-[color:var(--ink-muted)]">Sin existencias</p> : <div className="mt-1 flex flex-wrap items-baseline gap-2"><span className="text-base font-semibold text-[color:var(--forest)]">{formatL(product.price)}</span>{product.originalPrice ? <span className="text-xs text-[color:var(--ink-muted)] line-through">{formatL(product.originalPrice)}</span> : null}</div>}
         </div>
         <button
           type="button"

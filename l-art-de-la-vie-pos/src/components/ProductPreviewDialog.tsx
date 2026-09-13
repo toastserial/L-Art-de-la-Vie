@@ -42,7 +42,7 @@ export function ProductPreviewDialog({ product, onOpenChange, onEdit, onAdd }: P
               <DialogDescription className="font-mono">Código {product.code}</DialogDescription>
             </DialogHeader>
 
-            <p className="mt-7 text-3xl font-bold text-primary">L {product.price.toFixed(2)}</p>
+            <div className="mt-7 flex flex-wrap items-center gap-3"><p className="text-3xl font-bold text-primary">L {product.price.toFixed(2)}</p>{product.discountPercent > 0 && <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Oferta tienda web: -{product.discountPercent}%</span>}</div>
             <div className={`mt-6 rounded-2xl border p-4 ${lowStock ? "border-destructive/25 bg-destructive/5" : "border-primary/15 bg-primary/5"}`}>
               <div className="flex items-center gap-3">
                 {lowStock ? <PackageX className="h-6 w-6 text-destructive" /> : <PackageCheck className="h-6 w-6 text-primary" />}

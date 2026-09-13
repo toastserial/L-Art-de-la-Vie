@@ -34,7 +34,7 @@ export function ProductQuickView({ product, onClose, onAdd }: ProductQuickViewPr
           <div className="flex flex-col px-7 py-8 sm:px-11 sm:py-12">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--gold)]">Vista de la pieza</p>
             <h2 className="mt-4 font-serif text-4xl leading-tight text-[color:var(--ink)]">{product.name}</h2>
-            <p className="mt-5 text-2xl font-semibold text-[color:var(--forest)]">{formatL(product.price)}</p>
+            <div className="mt-5 flex flex-wrap items-baseline gap-3"><p className="text-2xl font-semibold text-[color:var(--forest)]">{formatL(product.price)}</p>{product.originalPrice ? <><span className="text-sm text-[color:var(--ink-muted)] line-through">{formatL(product.originalPrice)}</span><span className="rounded-full bg-[color:var(--forest)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--cream)]">-{product.discountPercent}%</span></> : null}</div>
             <p className="mt-7 text-sm leading-7 text-[color:var(--ink-muted)]">Una pieza seleccionada por L’Art de la Vie para transformar tus espacios y acompañar momentos especiales.</p>
 
             <div className="mt-8 flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--cream)]/55 p-4">

@@ -47,7 +47,9 @@ const productValues = (body) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw httpError(400, "Datos de producto inválidos");
   return {
     name: text(body.name, "Nombre", 160), category: text(body.category, "Categoría", 60),
-    price: number(body.price, "Precio", 0, 100_000_000), stock: integer(body.stock, "Stock"),
+    price: number(body.price, "Precio", 0, 100_000_000),
+    discount_percent: number(body.discountPercent ?? 0, "Descuento de catálogo", 0, 100),
+    stock: integer(body.stock, "Stock"),
     min_stock: integer(body.minStock, "Stock mínimo"), image_url: productImage(body.image)
   };
 };
@@ -101,6 +103,17 @@ const dateInTimezone = (value, timezone) => {
   }).formatToParts(new Date(value));
   const part = (type) => parts.find((item) => item.type === type)?.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
+};
+
+const catalogProductFromDb = (product) => {
+  const regularPrice = Number(product.price);
+  const discountPercent = Number(product.discount_percent ?? 0);
+  const salePrice = Math.round(regularPrice * (1 - discountPercent / 100) * 100) / 100;
+  return {
+    id: product.id, name: product.name, category: product.category, price: salePrice,
+    discountPercent, ...(discountPercent > 0 ? { originalPrice: regularPrice } : {}), stock: product.stock,
+    ...(product.image_url ? { image: product.image_url } : {})
+  };
 };
 
 async function loadSale(id) {
@@ -204,7 +217,7 @@ export function createApp() {
   app.get("/api/catalog", asyncRoute(async (_req, res) => {
     const [productResult, categoryResult] = await Promise.all([supabase
       .from("products")
-      .select("id,name,category,price,stock,image_url")
+      .select("id,name,category,price,discount_percent,stock,image_url")
       .eq("store_id", storeId)
       .eq("active", true)
       .order("name")
@@ -214,14 +227,7 @@ export function createApp() {
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");
     res.json({
       categories,
-      products: products.map((product) => ({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        price: Number(product.price),
-        stock: product.stock,
-        ...(product.image_url ? { image: product.image_url } : {})
-      }))
+      products: products.map(catalogProductFromDb)
     });
   }));
 
@@ -260,7 +266,7 @@ export function createApp() {
     const results = await Promise.all([
       supabase.from("stores").select("timezone").eq("id", storeId).single(),
       supabase.from("cash_openings").select("id,business_date,opening_cash,note,created_at").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
-      supabase.from("products").select("id,code,name,category,price,stock,min_stock,image_url").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
+      supabase.from("products").select("id,code,name,category,price,discount_percent,stock,min_stock,image_url").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
       supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name"),
       supabase.from("sales").select("id,folio,created_at,subtotal,discount,total,payment_method,cash_received,change_amount,sale_items(product_id,product_name,quantity,unit_price,subtotal)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
       supabase.from("inventory_movements").select("id,product_id,product_name,type,quantity,note,created_at").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
