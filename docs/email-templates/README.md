@@ -20,14 +20,6 @@ Plantillas listas para pegar en `Supabase Dashboard > Authentication > Email Tem
 
 No reemplaces `{{ .ConfirmationURL }}`. Supabase sustituye esa variable por el enlace seguro y único de cada solicitud.
 
-Para la app móvil, conserva también `lartdelavieclientes://**` dentro de `Authentication > URL Configuration > Redirect URLs`.
-
-## Página intermedia de confirmación
-
-La tienda incluye la ruta `/auth/confirmed`. Cuando esté desplegada:
-
-1. Agrega `https://TU-DOMINIO/auth/confirmed` a las Redirect URLs de Supabase.
-2. Configura `EXPO_PUBLIC_AUTH_REDIRECT_URL=https://TU-DOMINIO/auth/confirmed` en el build de la app de clientes.
-3. Conserva `VITE_CUSTOMER_APP_URL=lartdelavieclientes://auth/confirm` en la tienda web.
-
-Supabase confirma el enlace, abre la página web y el botón `Regresar a la app` entrega la sesión a la aplicación instalada.
+La aplicación móvil para compradores fue retirada. No configures el esquema
+`lartdelavieclientes://` ni variables `EXPO_PUBLIC_AUTH_REDIRECT_URL` o
+`VITE_CUSTOMER_APP_URL`; pertenecían exclusivamente a esa aplicación.

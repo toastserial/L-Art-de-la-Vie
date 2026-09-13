@@ -199,7 +199,7 @@ export function InventoryScreen() {
     />
     <Sheet visible={categoryOpen} onClose={() => setCategoryOpen(false)} title="Nueva categoría" footer={<Button title="Agregar categoría" icon="check" onPress={saveCategory} loading={busy} />}>
       <Field label="Nombre" value={newCategory} onChangeText={setNewCategory} placeholder="Ej. Joyería" maxLength={60} />
-      <Text style={styles.categoryHelp}>Se sincronizará con inventario, punto de venta, tienda web y app de clientes.</Text>
+      <Text style={styles.categoryHelp}>Se sincronizará con inventario, punto de venta y tienda web.</Text>
     </Sheet>
     <ImageCropper source={cropSource} onCancel={() => setCropSource(null)} onConfirm={useCroppedImage} />
   </>;

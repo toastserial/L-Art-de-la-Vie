@@ -302,7 +302,7 @@ export default function Inventory() {
           <div className="space-y-2 py-3">
             <Label>Nombre</Label>
             <Input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Ej. Joyería" maxLength={60} onKeyDown={(event) => event.key === "Enter" && handleAddCategory()} />
-            <p className="text-xs text-muted-foreground">Aparecerá automáticamente en inventario, venta, tienda web y app de clientes.</p>
+            <p className="text-xs text-muted-foreground">Aparecerá automáticamente en inventario, venta y tienda web.</p>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setCategoryDialog(false)}>Cancelar</Button><Button onClick={handleAddCategory}>Agregar categoría</Button></DialogFooter>
         </DialogContent>
