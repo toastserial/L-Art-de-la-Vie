@@ -126,9 +126,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as { items?: CartItem[] };
+        const parsed = JSON.parse(raw) as { items?: CartItem[]; lastAdded?: Product | null };
         if (parsed && Array.isArray(parsed.items)) {
           dispatch({ type: "hydrate", items: parsed.items });
+        }
+        if (parsed?.lastAdded && typeof parsed.lastAdded === "object") {
+          setLastAdded(parsed.lastAdded);
         }
       }
     } catch {
@@ -142,11 +145,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || !loadedRef.current) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items, lastAdded }));
     } catch {
       /* ignore */
     }
-  }, [hydrated, state.items]);
+  }, [hydrated, state.items, lastAdded]);
 
   const value = useMemo<CartContextValue>(() => {
     const count = state.items.reduce((s, i) => s + i.quantity, 0);
@@ -171,7 +174,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       },
       close: () => {
         setIsOpen(false);
-        setLastAdded(null);
       },
     };
   }, [state.items, lastAdded, isOpen]);

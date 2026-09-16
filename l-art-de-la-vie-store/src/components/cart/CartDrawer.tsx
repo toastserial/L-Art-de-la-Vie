@@ -29,12 +29,13 @@ export function CartDrawer() {
     const available = (catalog ?? []).filter(
       (product) => product.stock > 0 && !items.some((item) => item.id === product.id),
     );
-    if (!lastAdded) return [];
+    if (!lastAdded) return available.slice(0, 4);
 
     const related = available.filter((product) => product.category === lastAdded.category);
     const rest = available.filter((product) => product.category !== lastAdded.category);
     return [...related, ...rest].slice(0, 4);
   }, [catalog, items, lastAdded]);
+  const addedItemStillInBag = Boolean(lastAdded && items.some((item) => item.id === lastAdded.id));
 
   return (
     <>
@@ -80,7 +81,7 @@ export function CartDrawer() {
                   </div>
 
                   <div className="flex-1 overflow-y-auto px-6 pb-5">
-                    {lastAdded ? (
+                    {lastAdded && addedItemStillInBag ? (
                       <section className="mt-5 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--cream)] p-4" aria-label="Producto agregado">
                         <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--forest)]">
                           <span className="grid h-6 w-6 place-items-center rounded-full bg-[color:var(--forest)] text-white">
