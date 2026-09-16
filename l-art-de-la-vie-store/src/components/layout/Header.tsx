@@ -48,12 +48,12 @@ export function Header() {
             href="/"
             className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--gold)] rounded-full"
           >
-            <Logo size={scrolled ? 36 : 44} />
+            <Logo size={scrolled ? 44 : 58} className="ring-2 ring-[color:var(--gold)]/20" />
             <span className="flex flex-col leading-none">
-              <span className="font-serif text-lg italic tracking-tight text-[color:var(--forest)] sm:text-xl">
+              <span className="font-serif text-xl italic tracking-tight text-[color:var(--forest)] sm:text-2xl">
                 L’Art de la Vie
               </span>
-              <span className="mt-1 text-[10px] uppercase tracking-[0.28em] text-[color:var(--ink-muted)]">
+              <span className="mt-1 text-[9px] uppercase tracking-[0.22em] text-[color:var(--ink-muted)] sm:text-[10px] sm:tracking-[0.28em]">
                 Siguatepeque · Honduras
               </span>
             </span>

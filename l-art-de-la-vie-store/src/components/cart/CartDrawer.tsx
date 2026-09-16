@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
-import { ShoppingBag, X } from "lucide-react";
+import { Check, Plus, ShoppingBag, Truck, X } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
+import { useCatalog } from "@/hooks/useCatalog";
 import { formatL } from "@/lib/currency";
 import { CartItem } from "./CartItem";
 import { CheckoutDialog } from "./CheckoutDialog";
 
 export function CartDrawer() {
-  const { isOpen, close, items, subtotal, count } = useCart();
+  const { isOpen, close, items, subtotal, count, add, lastAdded } = useCart();
+  const { data: catalog } = useCatalog();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutRequested, setCheckoutRequested] = useState(false);
 
@@ -22,6 +24,17 @@ export function CartDrawer() {
     setCheckoutRequested(false);
     setCheckoutOpen(true);
   };
+
+  const recommendations = useMemo(() => {
+    const available = (catalog ?? []).filter(
+      (product) => product.stock > 0 && !items.some((item) => item.id === product.id),
+    );
+    if (!lastAdded) return [];
+
+    const related = available.filter((product) => product.category === lastAdded.category);
+    const rest = available.filter((product) => product.category !== lastAdded.category);
+    return [...related, ...rest].slice(0, 4);
+  }, [catalog, items, lastAdded]);
 
   return (
     <>
@@ -66,7 +79,28 @@ export function CartDrawer() {
                     </Dialog.Close>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-6">
+                  <div className="flex-1 overflow-y-auto px-6 pb-5">
+                    {lastAdded ? (
+                      <section className="mt-5 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--cream)] p-4" aria-label="Producto agregado">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--forest)]">
+                          <span className="grid h-6 w-6 place-items-center rounded-full bg-[color:var(--forest)] text-white">
+                            <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          </span>
+                          Agregado a tu bolsa
+                        </div>
+                        <div className="mt-3 flex gap-3">
+                          <img src={lastAdded.image} alt="" className="h-16 w-16 rounded-xl object-cover bg-white" />
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 text-sm font-medium leading-snug text-[color:var(--ink)]">{lastAdded.name}</p>
+                            <p className="mt-1 text-sm font-semibold text-[color:var(--forest)]">{formatL(lastAdded.price)}</p>
+                          </div>
+                        </div>
+                        <p className="mt-3 flex items-center gap-2 text-xs text-[color:var(--ink-muted)]">
+                          <Truck className="h-4 w-4 text-[color:var(--gold)]" /> Enviamos a Siguatepeque y a todo Honduras.
+                        </p>
+                      </section>
+                    ) : null}
+
                     {items.length === 0 ? (
                       <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
                         <ShoppingBag
@@ -91,12 +125,43 @@ export function CartDrawer() {
                         </Dialog.Close>
                       </div>
                     ) : (
-                      <ul className="divide-y divide-[color:var(--border)]">
+                      <ul className="divide-y divide-[color:var(--border)] mt-3">
                         {items.map((it) => (
                           <CartItem key={it.id} item={it} />
                         ))}
                       </ul>
                     )}
+
+                    {recommendations.length > 0 ? (
+                      <section className="mt-6 border-t border-[color:var(--border)] pt-5">
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--gold)]">Para complementar</p>
+                            <h3 className="mt-1 font-serif text-xl text-[color:var(--ink)]">También te puede gustar</h3>
+                          </div>
+                          <span className="text-xs text-[color:var(--ink-muted)]">Elegidos para ti</span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          {recommendations.map((product) => (
+                            <article key={product.id} className="group rounded-2xl border border-[color:var(--border)] bg-white p-2.5 shadow-sm">
+                              <img src={product.image} alt="" className="aspect-square w-full rounded-xl object-cover bg-[color:var(--cream)]" loading="lazy" />
+                              <p className="mt-2 line-clamp-2 text-xs font-medium leading-snug text-[color:var(--ink)]">{product.name}</p>
+                              <div className="mt-1 flex items-baseline gap-1.5">
+                                <span className="text-sm font-semibold text-[color:var(--forest)]">{formatL(product.price)}</span>
+                                {product.originalPrice ? <span className="text-[10px] text-[color:var(--ink-muted)] line-through">{formatL(product.originalPrice)}</span> : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => add(product, 1)}
+                                className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-full border border-[color:var(--forest)] px-2 text-xs font-medium text-[color:var(--forest)] transition hover:bg-[color:var(--forest)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--gold)]"
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Agregar
+                              </button>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
                   </div>
 
                   {items.length > 0 ? (

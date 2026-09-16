@@ -6,6 +6,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import type { CartItem, Product } from "@/types/product";
@@ -104,6 +105,7 @@ interface CartContextValue {
   remove: (id: string) => void;
   clear: () => void;
   reconcile: (products: Product[]) => void;
+  lastAdded: Product | null;
   isOpen: boolean;
   open: () => void;
   close: () => void;
@@ -115,8 +117,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { items: [] });
   const hydrated = useHydrated();
   const loadedRef = useRef(false);
-  const isOpenRef = useRef(false);
-  const [, force] = useReducer((x: number) => x + 1, 0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [lastAdded, setLastAdded] = useState<Product | null>(null);
 
   // hydrate from localStorage
   useEffect(() => {
@@ -153,22 +155,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items: state.items,
       count,
       subtotal,
-      add: (product, q) => dispatch({ type: "add", product, quantity: q }),
+      add: (product, q) => {
+        if (product.stock <= 0) return;
+        setLastAdded(product);
+        dispatch({ type: "add", product, quantity: q });
+      },
       setQty: (id, q) => dispatch({ type: "setQty", id, quantity: q }),
       remove: (id) => dispatch({ type: "remove", id }),
       clear: () => dispatch({ type: "clear" }),
       reconcile: (products) => dispatch({ type: "reconcile", products }),
-      isOpen: isOpenRef.current,
+      lastAdded,
+      isOpen,
       open: () => {
-        isOpenRef.current = true;
-        force();
+        setIsOpen(true);
       },
       close: () => {
-        isOpenRef.current = false;
-        force();
+        setIsOpen(false);
+        setLastAdded(null);
       },
     };
-  }, [state.items]);
+  }, [state.items, lastAdded, isOpen]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
