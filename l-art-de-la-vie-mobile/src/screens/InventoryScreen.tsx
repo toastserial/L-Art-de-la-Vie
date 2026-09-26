@@ -132,7 +132,9 @@ export function InventoryScreen() {
         productType: result.specifications.Tipo || "",
       }));
       setSuggestedCategory(result.suggestedCategory || null);
-      setAnalysisNote(`Sugerencias listas · ${result.usage.remaining} análisis disponibles este mes. Revisa los datos antes de guardar.`);
+      setAnalysisNote(result.analysisMode === "semantic"
+        ? `Análisis semántico listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`
+        : `Análisis básico listo · ${result.usage.remaining} disponibles este mes. Revisa especialmente tipo, color y material.`);
     } catch (reason) {
       setAnalysisNote(null);
       setSuggestedCategory(null);

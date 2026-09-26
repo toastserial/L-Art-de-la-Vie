@@ -20,9 +20,9 @@ Fuentes oficiales:
 2. Crea un proyecto, por ejemplo `lart-vision`.
 3. Vincula una cuenta de facturación al proyecto. No significa un cobro mensual fijo; habilita el consumo por uso.
 4. Abre **APIs y servicios → Biblioteca**.
-5. Busca **Cloud Vision API** y pulsa **Habilitar**.
+5. Habilita **Cloud Vision API** y **Generative Language API**. La segunda activa el análisis semántico general con Gemini.
 6. Abre **APIs y servicios → Credenciales → Crear credenciales → Clave de API**.
-7. Edita la clave y en **Restricciones de API** selecciona **Restringir clave → Cloud Vision API**.
+7. Edita la clave y en **Restricciones de API** permite **Cloud Vision API** y **Generative Language API**.
 8. Guarda la clave en un administrador de contraseñas. No debe colocarse en Expo, Vite, GitHub ni archivos `.env` públicos.
 
 ## 2. Evitar cobros inesperados
@@ -46,11 +46,12 @@ En el servicio del backend abre **Environment** y agrega:
 
 ```text
 GOOGLE_VISION_API_KEY=la_clave_creada_en_google
+# Solo hace falta si Gemini usa una clave diferente.
 GEMINI_API_KEY=la_clave_creada_en_google_ai_studio
 GOOGLE_VISION_MONTHLY_LIMIT=100
 ```
 
-`GEMINI_API_KEY` es opcional, pero recomendado: permite comprender el producto completo y devolver datos estructurados en español. Sin esa clave, la aplicación usa Cloud Vision con reglas conservadoras y deja vacíos los campos dudosos.
+El backend intenta usar Gemini con `GEMINI_API_KEY` y, si no existe, con `GOOGLE_VISION_API_KEY`. La clave utilizada debe permitir Generative Language API. Así Gemini puede comprender cualquier clase de producto y devolver datos estructurados en español; Cloud Vision queda como respaldo básico.
 
 Guarda los cambios y espera el nuevo despliegue. Las claves existen únicamente en el servidor.
 

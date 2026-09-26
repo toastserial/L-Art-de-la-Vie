@@ -39,6 +39,7 @@ export interface ProductImageAnalysis {
   specifications: Record<string, string>;
   visibleText: string;
   confidence: number | null;
+  analysisMode: "semantic" | "basic";
   usage: { used: number; limit: number; remaining: number };
 }
 

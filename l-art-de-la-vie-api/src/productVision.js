@@ -219,13 +219,11 @@ async function analyzeWithCloudVision(apiKey, buffer, categories) {
 }
 
 export async function analyzeProductPhoto(apiKey, buffer, categories, mimeType = "image/jpeg") {
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  if (geminiKey) {
-    try {
-      return await analyzeWithGemini(geminiKey, buffer, categories, mimeType);
-    } catch (error) {
-      console.warn({ event: "gemini_product_analysis_fallback", message: error instanceof Error ? error.message : "unknown" });
-    }
+  const geminiKey = process.env.GEMINI_API_KEY?.trim() || apiKey;
+  try {
+    return { ...(await analyzeWithGemini(geminiKey, buffer, categories, mimeType)), analysisMode: "semantic" };
+  } catch (error) {
+    console.warn({ event: "gemini_product_analysis_fallback", message: error instanceof Error ? error.message : "unknown" });
   }
-  return analyzeWithCloudVision(apiKey, buffer, categories);
+  return { ...(await analyzeWithCloudVision(apiKey, buffer, categories)), analysisMode: "basic" };
 }
