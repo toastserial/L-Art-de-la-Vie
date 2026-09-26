@@ -480,7 +480,7 @@ export function createApp() {
     const categories = unwrap(await supabase.from("product_categories")
       .select("name").eq("store_id", storeId).eq("active", true).order("name"))
       .map((category) => category.name);
-    const analysis = await analyzeProductPhoto(process.env.GOOGLE_VISION_API_KEY, req.file.buffer, categories);
+    const analysis = await analyzeProductPhoto(process.env.GOOGLE_VISION_API_KEY, req.file.buffer, categories, detected.mime);
     const nextUsed = used + 1;
     unwrap(await supabase.from("product_vision_usage").upsert({
       store_id: storeId,

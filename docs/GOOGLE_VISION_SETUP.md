@@ -46,10 +46,13 @@ En el servicio del backend abre **Environment** y agrega:
 
 ```text
 GOOGLE_VISION_API_KEY=la_clave_creada_en_google
+GEMINI_API_KEY=la_clave_creada_en_google_ai_studio
 GOOGLE_VISION_MONTHLY_LIMIT=100
 ```
 
-Guarda los cambios y espera el nuevo despliegue. La clave existe únicamente en el servidor.
+`GEMINI_API_KEY` es opcional, pero recomendado: permite comprender el producto completo y devolver datos estructurados en español. Sin esa clave, la aplicación usa Cloud Vision con reglas conservadoras y deja vacíos los campos dudosos.
+
+Guarda los cambios y espera el nuevo despliegue. Las claves existen únicamente en el servidor.
 
 ## 5. Probar desde el celular
 
@@ -67,4 +70,4 @@ Si Google falla, no está configurado o llega al límite, la app muestra **Conti
 
 ## Qué puede y qué no puede reconocer
 
-Vision es bueno detectando objetos generales, texto visible, logos y colores. Material, categoría y nombre son aproximaciones; no debe inventar precio, stock, dimensiones, aroma, modelo exacto ni composición. Por eso todas las sugerencias quedan editables y requieren confirmación humana.
+Gemini comprende el producto de forma semántica y Cloud Vision sirve como respaldo para texto, logos y objetos generales. Ninguno debe inventar precio, stock, dimensiones, aroma, modelo exacto ni composición. Por eso todas las sugerencias quedan editables y requieren confirmación humana.
