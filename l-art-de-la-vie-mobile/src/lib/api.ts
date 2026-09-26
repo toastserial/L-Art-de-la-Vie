@@ -34,6 +34,7 @@ export async function uploadProductImage(uri: string, mimeType?: string | null, 
 export interface ProductImageAnalysis {
   name: string;
   category: string;
+  suggestedCategory: string;
   description: string;
   specifications: Record<string, string>;
   visibleText: string;

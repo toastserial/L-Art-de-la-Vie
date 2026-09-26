@@ -555,6 +555,7 @@ components:
       properties:
         name: { type: string }
         category: { type: string }
+        suggestedCategory: { type: string }
         description: { type: string }
         specifications:
           type: object

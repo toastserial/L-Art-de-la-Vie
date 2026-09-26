@@ -30,6 +30,8 @@ export function InventoryScreen() {
   const [preparingImage, setPreparingImage] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [analysisNote, setAnalysisNote] = useState<string | null>(null);
+  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+  const [creatingSuggestedCategory, setCreatingSuggestedCategory] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -53,9 +55,9 @@ export function InventoryScreen() {
   const openNew = () => {
     const firstCategory = categories[0];
     if (!firstCategory) { setCategoryOpen(true); return; }
-    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
+    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setSuggestedCategory(null); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
   };
-  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), description: product.description ?? "", brand: product.specifications?.Marca ?? "", color: product.specifications?.Color ?? "", material: product.specifications?.Material ?? "", productType: product.specifications?.Tipo ?? "", image: product.image }); setProductOpen(true); };
+  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setSuggestedCategory(null); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), description: product.description ?? "", brand: product.specifications?.Marca ?? "", color: product.specifications?.Color ?? "", material: product.specifications?.Material ?? "", productType: product.specifications?.Tipo ?? "", image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
@@ -67,6 +69,7 @@ export function InventoryScreen() {
     setPendingImage({ uri: image.uri, width: image.width, height: image.height, mimeType: image.mimeType, fileName: image.fileName });
     setForm(current => ({ ...current, image: image.uri }));
     setAnalysisNote(null);
+    setSuggestedCategory(null);
     setCropSource(null);
   };
 
@@ -128,12 +131,29 @@ export function InventoryScreen() {
         material: result.specifications.Material || "",
         productType: result.specifications.Tipo || "",
       }));
+      setSuggestedCategory(result.suggestedCategory || null);
       setAnalysisNote(`Sugerencias listas · ${result.usage.remaining} análisis disponibles este mes. Revisa los datos antes de guardar.`);
     } catch (reason) {
       setAnalysisNote(null);
+      setSuggestedCategory(null);
       Alert.alert("Continúa manualmente", reason instanceof Error ? reason.message : "No se pudo analizar la foto. Puedes llenar los datos normalmente.");
     } finally {
       setAnalyzingImage(false);
+    }
+  };
+
+  const createSuggestedCategory = async () => {
+    if (!suggestedCategory || creatingSuggestedCategory) return;
+    setCreatingSuggestedCategory(true);
+    try {
+      const existing = categories.find(category => category.localeCompare(suggestedCategory, "es", { sensitivity: "base" }) === 0);
+      if (!existing) await addCategory(suggestedCategory);
+      setForm(current => ({ ...current, category: existing || suggestedCategory }));
+      setSuggestedCategory(null);
+    } catch (reason) {
+      Alert.alert("No se creó la categoría", reason instanceof Error ? reason.message : "Intenta nuevamente");
+    } finally {
+      setCreatingSuggestedCategory(false);
     }
   };
 
@@ -215,11 +235,15 @@ export function InventoryScreen() {
             <Button title={form.image ? "Cambiar" : "Agregar"} icon="image-plus" variant="secondary" compact onPress={selectPhoto} />
             {form.image && <Button title="Reencuadrar" icon="crop" variant="ghost" compact loading={preparingImage} onPress={() => editCurrentPhoto()} />}
           </View>
-          {form.image && <Pressable onPress={() => { setPendingImage(null); setAnalysisNote(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
+          {form.image && <Pressable onPress={() => { setPendingImage(null); setAnalysisNote(null); setSuggestedCategory(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
         </View>
       </View>
       {pendingImage && <Button title="Analizar y sugerir datos" icon="creation" variant="secondary" onPress={analyzePhoto} loading={analyzingImage} style={styles.analyzeButton} />}
       {analysisNote && <View style={styles.analysisCard}><MaterialCommunityIcons name="check-decagram-outline" size={21} color={colors.forest} /><Text style={styles.analysisText}>{analysisNote}</Text></View>}
+      {suggestedCategory && <View style={styles.categorySuggestionCard}>
+        <View style={styles.categorySuggestionCopy}><Text style={styles.categorySuggestionTitle}>Categoría sugerida: {suggestedCategory}</Text><Text style={styles.categorySuggestionText}>No existe todavía. Créala para usarla en este producto y en futuros análisis.</Text></View>
+        <Button title="Crear y usar" icon="folder-plus-outline" compact onPress={createSuggestedCategory} loading={creatingSuggestedCategory} />
+      </View>}
       <Field label="Nombre" value={form.name} onChangeText={name => setForm(current => ({ ...current, name }))} placeholder="Nombre del producto" />
       <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
       <View style={styles.fieldSpacer} />
@@ -273,6 +297,8 @@ const styles = StyleSheet.create({
   analyzeButton: { marginTop: -7, marginBottom: 14 },
   analysisCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, padding: 13, marginBottom: 17 },
   analysisText: { flex: 1, color: colors.forest, fontSize: 11, lineHeight: 17, fontWeight: "700" },
+  categorySuggestionCard: { borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 13, marginBottom: 17, gap: 11 },
+  categorySuggestionCopy: { gap: 3 }, categorySuggestionTitle: { color: colors.ink, fontSize: 13, fontWeight: "900" }, categorySuggestionText: { color: colors.muted, fontSize: 10, lineHeight: 15 },
   specTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginTop: 2 },
   specHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 4, marginBottom: 13 },
 });
