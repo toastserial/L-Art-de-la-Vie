@@ -332,6 +332,30 @@ paths:
                   url: { type: string, format: uri }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-image-analysis:
+    post:
+      tags: [Productos]
+      summary: Sugiere datos de un producto a partir de una fotografía
+      description: Requiere owner o admin. Diseñado para la app móvil; no guarda el producto y permite revisión humana antes de confirmar.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+      responses:
+        '200':
+          description: Sugerencias y consumo mensual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImageAnalysis' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { description: Límite preventivo o cuota agotada }
+        '503': { description: Integración no configurada }
   /api/products/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -506,6 +530,10 @@ components:
         stock: { type: integer, minimum: 0, example: 10 }
         minStock: { type: integer, minimum: 0, example: 3 }
         image: { type: string, format: uri }
+        description: { type: string, maxLength: 1000 }
+        specifications:
+          type: object
+          additionalProperties: { type: string }
     CatalogProduct:
       type: object
       required: [id, name, category, price, stock]
@@ -518,6 +546,27 @@ components:
         discountPercent: { type: number, minimum: 0, maximum: 100 }
         stock: { type: integer, minimum: 0 }
         image: { type: string, format: uri }
+        description: { type: string }
+        specifications:
+          type: object
+          additionalProperties: { type: string }
+    ProductImageAnalysis:
+      type: object
+      properties:
+        name: { type: string }
+        category: { type: string }
+        description: { type: string }
+        specifications:
+          type: object
+          additionalProperties: { type: string }
+        visibleText: { type: string }
+        confidence: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+        usage:
+          type: object
+          properties:
+            used: { type: integer }
+            limit: { type: integer }
+            remaining: { type: integer }
     Product:
       allOf:
         - type: object

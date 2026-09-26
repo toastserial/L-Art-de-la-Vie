@@ -30,3 +30,23 @@ export async function uploadProductImage(uri: string, mimeType?: string | null, 
   } as unknown as Blob);
   return api<{ url: string }>("/product-images", { method: "POST", body: form });
 }
+
+export interface ProductImageAnalysis {
+  name: string;
+  category: string;
+  description: string;
+  specifications: Record<string, string>;
+  visibleText: string;
+  confidence: number | null;
+  usage: { used: number; limit: number; remaining: number };
+}
+
+export async function analyzeProductImage(uri: string, mimeType?: string | null, fileName?: string | null) {
+  const form = new FormData();
+  form.append("image", {
+    uri,
+    type: mimeType || "image/jpeg",
+    name: fileName || `producto-analisis-${Date.now()}.jpg`,
+  } as unknown as Blob);
+  return api<ProductImageAnalysis>("/product-image-analysis", { method: "POST", body: form });
+}

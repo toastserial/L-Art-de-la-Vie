@@ -7,15 +7,15 @@ import { Button, Card, EmptyState, Field, PaginationControls, Pill, Segmented, S
 import { Page } from "../components/Page";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
-import { uploadProductImage } from "../lib/api";
+import { analyzeProductImage, uploadProductImage } from "../lib/api";
 import { colors, money, shortDate } from "../theme";
 import type { Category, Product } from "../types";
 import { ImageCropper, type CropSource, type CroppedImage } from "../components/ImageCropper";
 import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
 
-interface ProductForm { name: string; category: Category; price: string; discountPercent: string; stock: string; minStock: string; image?: string }
+interface ProductForm { name: string; category: Category; price: string; discountPercent: string; stock: string; minStock: string; description: string; brand: string; color: string; material: string; productType: string; image?: string }
 interface PendingImage { uri: string; width: number; height: number; mimeType?: string | null; fileName?: string | null }
-const blank: ProductForm = { name: "", category: "Decoración", price: "", discountPercent: "0", stock: "", minStock: "3" };
+const blank: ProductForm = { name: "", category: "Decoración", price: "", discountPercent: "0", stock: "", minStock: "3", description: "", brand: "", color: "", material: "", productType: "" };
 
 export function InventoryScreen() {
   const { canManage } = useAuth();
@@ -28,6 +28,8 @@ export function InventoryScreen() {
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [cropSource, setCropSource] = useState<CropSource | null>(null);
   const [preparingImage, setPreparingImage] = useState(false);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [analysisNote, setAnalysisNote] = useState<string | null>(null);
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementProduct, setMovementProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<"entrada" | "salida">("entrada");
@@ -51,9 +53,9 @@ export function InventoryScreen() {
   const openNew = () => {
     const firstCategory = categories[0];
     if (!firstCategory) { setCategoryOpen(true); return; }
-    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
+    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
   };
-  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), image: product.image }); setProductOpen(true); };
+  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), description: product.description ?? "", brand: product.specifications?.Marca ?? "", color: product.specifications?.Color ?? "", material: product.specifications?.Material ?? "", productType: product.specifications?.Tipo ?? "", image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
@@ -64,6 +66,7 @@ export function InventoryScreen() {
   const useCroppedImage = (image: CroppedImage) => {
     setPendingImage({ uri: image.uri, width: image.width, height: image.height, mimeType: image.mimeType, fileName: image.fileName });
     setForm(current => ({ ...current, image: image.uri }));
+    setAnalysisNote(null);
     setCropSource(null);
   };
 
@@ -110,6 +113,30 @@ export function InventoryScreen() {
     { text: "Cancelar", style: "cancel" },
   ]);
 
+  const analyzePhoto = async () => {
+    if (!pendingImage) return Alert.alert("Toma una foto nueva", "Para analizar, toma una foto o elige una de la galería y confirma el recorte.");
+    setAnalyzingImage(true);
+    try {
+      const result = await analyzeProductImage(pendingImage.uri, pendingImage.mimeType, pendingImage.fileName);
+      setForm(current => ({
+        ...current,
+        name: result.name || current.name,
+        category: result.category || current.category,
+        description: result.description || current.description,
+        brand: result.specifications.Marca || "",
+        color: result.specifications.Color || "",
+        material: result.specifications.Material || "",
+        productType: result.specifications.Tipo || "",
+      }));
+      setAnalysisNote(`Sugerencias listas · ${result.usage.remaining} análisis disponibles este mes. Revisa los datos antes de guardar.`);
+    } catch (reason) {
+      setAnalysisNote(null);
+      Alert.alert("Continúa manualmente", reason instanceof Error ? reason.message : "No se pudo analizar la foto. Puedes llenar los datos normalmente.");
+    } finally {
+      setAnalyzingImage(false);
+    }
+  };
+
   const saveProduct = async () => {
     const price = Number(form.price), discountPercent = Number(form.discountPercent), stock = Number(form.stock), minStock = Number(form.minStock);
     if (!form.name.trim()) return Alert.alert("Falta el nombre", "Escribe el nombre del producto.");
@@ -118,7 +145,10 @@ export function InventoryScreen() {
     try {
       let image = form.image;
       if (pendingImage) image = (await uploadProductImage(pendingImage.uri, pendingImage.mimeType, pendingImage.fileName)).url;
-      const values = { name: form.name.trim(), category: form.category, price, discountPercent, stock, minStock, image };
+      const specifications = Object.fromEntries([
+        ["Marca", form.brand.trim()], ["Color", form.color.trim()], ["Material", form.material.trim()], ["Tipo", form.productType.trim()]
+      ].filter(([, value]) => value));
+      const values = { name: form.name.trim(), category: form.category, price, discountPercent, stock, minStock, description: form.description.trim(), specifications, image };
       if (editing) await updateProduct({ ...editing, ...values }); else await addProduct(values);
       setProductOpen(false);
     } catch (reason) { Alert.alert("No se guardó", reason instanceof Error ? reason.message : "Intenta nuevamente"); }
@@ -185,15 +215,22 @@ export function InventoryScreen() {
             <Button title={form.image ? "Cambiar" : "Agregar"} icon="image-plus" variant="secondary" compact onPress={selectPhoto} />
             {form.image && <Button title="Reencuadrar" icon="crop" variant="ghost" compact loading={preparingImage} onPress={() => editCurrentPhoto()} />}
           </View>
-          {form.image && <Pressable onPress={() => { setPendingImage(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
+          {form.image && <Pressable onPress={() => { setPendingImage(null); setAnalysisNote(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
         </View>
       </View>
+      {pendingImage && <Button title="Analizar y sugerir datos" icon="creation" variant="secondary" onPress={analyzePhoto} loading={analyzingImage} style={styles.analyzeButton} />}
+      {analysisNote && <View style={styles.analysisCard}><MaterialCommunityIcons name="check-decagram-outline" size={21} color={colors.forest} /><Text style={styles.analysisText}>{analysisNote}</Text></View>}
       <Field label="Nombre" value={form.name} onChangeText={name => setForm(current => ({ ...current, name }))} placeholder="Nombre del producto" />
       <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
       <View style={styles.fieldSpacer} />
       <Field label="Precio" value={form.price} onChangeText={price => setForm(current => ({ ...current, price }))} keyboardType="decimal-pad" placeholder="0.00" />
       <Field label="Oferta tienda web (%)" value={form.discountPercent} onChangeText={discountPercent => setForm(current => ({ ...current, discountPercent }))} keyboardType="decimal-pad" placeholder="0" /><Text style={styles.offerHelp}>El descuento se muestra en la tienda web; el precio de caja no cambia.</Text>
       <View style={styles.twoFields}><View style={styles.half}><Field label="Existencias" value={form.stock} onChangeText={stock => setForm(current => ({ ...current, stock }))} keyboardType="number-pad" placeholder="0" /></View><View style={styles.half}><Field label="Stock mínimo" value={form.minStock} onChangeText={minStock => setForm(current => ({ ...current, minStock }))} keyboardType="number-pad" placeholder="3" /></View></View>
+      <Field label="Descripción para la tienda" value={form.description} onChangeText={description => setForm(current => ({ ...current, description }))} placeholder="Describe el producto en pocas palabras" multiline maxLength={1000} />
+      <Text style={styles.specTitle}>Especificaciones</Text>
+      <Text style={styles.specHelp}>Google puede sugerirlas desde la foto; puedes corregirlas o llenarlas manualmente.</Text>
+      <View style={styles.twoFields}><View style={styles.half}><Field label="Marca" value={form.brand} onChangeText={brand => setForm(current => ({ ...current, brand }))} placeholder="Opcional" /></View><View style={styles.half}><Field label="Color" value={form.color} onChangeText={color => setForm(current => ({ ...current, color }))} placeholder="Opcional" /></View></View>
+      <View style={styles.twoFields}><View style={styles.half}><Field label="Material" value={form.material} onChangeText={material => setForm(current => ({ ...current, material }))} placeholder="Opcional" /></View><View style={styles.half}><Field label="Tipo" value={form.productType} onChangeText={productType => setForm(current => ({ ...current, productType }))} placeholder="Opcional" /></View></View>
     </Sheet>
 
     <Sheet visible={movementOpen} onClose={() => setMovementOpen(false)} title="Ajustar inventario" footer={<Button title="Registrar movimiento" icon="check" onPress={saveMovement} loading={busy} />}>
@@ -233,4 +270,9 @@ const styles = StyleSheet.create({
   photoEmpty: { flex: 1, alignItems: "center", justifyContent: "center" }, photoEmptyTitle: { color: colors.forest, fontSize: 11, fontWeight: "800", marginTop: 5 }, photoEmptyCopy: { color: colors.muted, fontSize: 9, marginTop: 2 },
   photoEdit: { position: "absolute", right: 7, bottom: 7, width: 30, height: 30, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
   photoHelp: { flex: 1 }, photoTitle: { color: colors.ink, fontWeight: "800", fontSize: 13 }, photoCopy: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 }, photoActions: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 }, removePhoto: { color: colors.danger, fontSize: 11, fontWeight: "800", marginTop: 9 },
+  analyzeButton: { marginTop: -7, marginBottom: 14 },
+  analysisCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, padding: 13, marginBottom: 17 },
+  analysisText: { flex: 1, color: colors.forest, fontSize: 11, lineHeight: 17, fontWeight: "700" },
+  specTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginTop: 2 },
+  specHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 4, marginBottom: 13 },
 });

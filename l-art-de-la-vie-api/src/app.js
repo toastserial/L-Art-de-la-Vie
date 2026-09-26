@@ -12,6 +12,7 @@ import { closeFromDb, expenseFromDb, movementFromDb, openingFromDb, productFromD
 import { storeId, supabase, unwrap } from "./supabase.js";
 import { httpError, integer, number, optionalText, text, uuid } from "./validation.js";
 import { requireAuth, requireRole, requireUserAuth } from "./auth.js";
+import { analyzeProductPhoto } from "./productVision.js";
 
 const paymentMethods = ["efectivo", "tarjeta", "transferencia"];
 const openApiDocument = YAML.parse(readFileSync(new URL("../docs/openapi.yaml", import.meta.url), "utf8"));
@@ -25,6 +26,10 @@ const imageLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false,
   message: { message: "Se alcanzó el límite de fotografías por hora." }
 });
+const visionLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false,
+  message: { message: "Se alcanzó el límite de análisis por hora. Continúa manualmente o inténtalo más tarde." }
+});
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 6 * 1024 * 1024, files: 1 },
@@ -33,6 +38,7 @@ const imageUpload = multer({
     callback(allowed.includes(file.mimetype) ? null : httpError(400, "Formato de imagen no permitido"), allowed.includes(file.mimetype));
   }
 });
+const visionMonthlyLimit = Math.max(1, Math.min(1000, Number.parseInt(process.env.GOOGLE_VISION_MONTHLY_LIMIT ?? "100", 10) || 100));
 
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const firstRow = (value) => Array.isArray(value) ? value[0] : value;
@@ -50,8 +56,17 @@ const productValues = (body) => {
     price: number(body.price, "Precio", 0, 100_000_000),
     discount_percent: number(body.discountPercent ?? 0, "Descuento de catálogo", 0, 100),
     stock: integer(body.stock, "Stock"),
-    min_stock: integer(body.minStock, "Stock mínimo"), image_url: productImage(body.image)
+    min_stock: integer(body.minStock, "Stock mínimo"), image_url: productImage(body.image),
+    description: optionalText(body.description, "Descripción", 1000),
+    specifications: productSpecifications(body.specifications)
   };
+};
+const productSpecifications = (value) => {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) throw httpError(400, "Las especificaciones no son válidas");
+  const entries = Object.entries(value).filter(([, item]) => item !== undefined && item !== null && String(item).trim() !== "");
+  if (entries.length > 12) throw httpError(400, "Solo se permiten 12 especificaciones por producto");
+  return Object.fromEntries(entries.map(([key, item]) => [text(key, "Nombre de especificación", 50), text(String(item), "Valor de especificación", 160)]));
 };
 const categoryName = (value) => text(value, "Categoría", 60).replace(/\s+/g, " ");
 const staffRoles = ["owner", "admin", "cashier"];
@@ -112,6 +127,7 @@ const catalogProductFromDb = (product) => {
   return {
     id: product.id, name: product.name, category: product.category, price: salePrice,
     discountPercent, ...(discountPercent > 0 ? { originalPrice: regularPrice } : {}), stock: product.stock,
+    description: product.description ?? "", specifications: product.specifications ?? {},
     ...(product.image_url ? { image: product.image_url } : {})
   };
 };
@@ -178,7 +194,8 @@ export function createApp() {
   }));
   app.use(express.json({ limit: "100kb" }));
   app.use("/api", (req, _res, next) => {
-    const needsJson = ["POST", "PUT", "PATCH"].includes(req.method) && req.path !== "/product-images";
+    const multipartPaths = new Set(["/product-images", "/product-image-analysis"]);
+    const needsJson = ["POST", "PUT", "PATCH"].includes(req.method) && !multipartPaths.has(req.path);
     if (needsJson && !req.is("application/json")) return next(httpError(415, "La solicitud debe usar application/json"));
     if (needsJson && (!req.body || typeof req.body !== "object" || Array.isArray(req.body))) {
       return next(httpError(400, "El cuerpo de la solicitud no es válido"));
@@ -217,7 +234,7 @@ export function createApp() {
   app.get("/api/catalog", asyncRoute(async (_req, res) => {
     const [productResult, categoryResult] = await Promise.all([supabase
       .from("products")
-      .select("id,name,category,price,discount_percent,stock,image_url")
+      .select("id,name,category,price,discount_percent,stock,image_url,description,specifications")
       .eq("store_id", storeId)
       .eq("active", true)
       .order("name")
@@ -266,7 +283,7 @@ export function createApp() {
     const results = await Promise.all([
       supabase.from("stores").select("timezone").eq("id", storeId).single(),
       supabase.from("cash_openings").select("id,business_date,opening_cash,note,created_at").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
-      supabase.from("products").select("id,code,name,category,price,discount_percent,stock,min_stock,image_url").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
+      supabase.from("products").select("id,code,name,category,price,discount_percent,stock,min_stock,image_url,description,specifications").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
       supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name"),
       supabase.from("sales").select("id,folio,created_at,subtotal,discount,total,payment_method,cash_received,change_amount,sale_items(product_id,product_name,quantity,unit_price,subtotal)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
       supabase.from("inventory_movements").select("id,product_id,product_name,type,quantity,note,created_at").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
@@ -420,6 +437,43 @@ export function createApp() {
     }));
     const { data } = supabase.storage.from("product-images").getPublicUrl(objectPath);
     res.status(201).json({ url: data.publicUrl });
+  }));
+
+  app.post("/api/product-image-analysis", requireRole("owner", "admin"), visionLimiter, imageUpload.single("image"), asyncRoute(async (req, res) => {
+    if (!process.env.GOOGLE_VISION_API_KEY) {
+      throw httpError(503, "El análisis inteligente aún no está configurado. Puedes completar el producto manualmente.", "VISION_NOT_CONFIGURED");
+    }
+    if (!req.file) throw httpError(400, "Selecciona una fotografía para analizar");
+    const detected = await fileTypeFromBuffer(req.file.buffer);
+    const supportedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!detected || !supportedTypes.has(detected.mime)) {
+      throw httpError(400, "Para analizar usa una foto JPG, PNG o WebP. Puedes completar el producto manualmente.");
+    }
+
+    const billingMonth = `${new Date().toISOString().slice(0, 7)}-01`;
+    const usage = unwrap(await supabase.from("product_vision_usage")
+      .select("analysis_count")
+      .eq("store_id", storeId)
+      .eq("billing_month", billingMonth)
+      .maybeSingle());
+    const used = Number(usage?.analysis_count ?? 0);
+    if (used >= visionMonthlyLimit) {
+      throw httpError(429, "Se alcanzó el límite mensual de análisis. Continúa llenando los datos manualmente.", "VISION_MONTHLY_LIMIT_REACHED");
+    }
+
+    const categories = unwrap(await supabase.from("product_categories")
+      .select("name").eq("store_id", storeId).eq("active", true).order("name"))
+      .map((category) => category.name);
+    const analysis = await analyzeProductPhoto(process.env.GOOGLE_VISION_API_KEY, req.file.buffer, categories);
+    const nextUsed = used + 1;
+    unwrap(await supabase.from("product_vision_usage").upsert({
+      store_id: storeId,
+      billing_month: billingMonth,
+      analysis_count: nextUsed,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "store_id,billing_month" }));
+
+    res.json({ ...analysis, usage: { used: nextUsed, limit: visionMonthlyLimit, remaining: Math.max(0, visionMonthlyLimit - nextUsed) } });
   }));
 
   app.put("/api/products/:id", requireRole("owner", "admin"), asyncRoute(async (req, res) => {

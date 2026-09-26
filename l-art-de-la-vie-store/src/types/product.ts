@@ -9,6 +9,8 @@ export interface Product {
   discountPercent: number;
   stock: number;
   image: string;
+  description: string;
+  specifications: Record<string, string>;
 }
 
 export interface CartItem {

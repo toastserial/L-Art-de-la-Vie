@@ -36,6 +36,12 @@ export function ProductPreviewSheet({ product, onClose, primaryLabel, primaryIco
       <Text style={styles.code}>CÓDIGO {product.code}</Text>
       <Text style={styles.name}>{product.name}</Text>
       <View style={styles.priceRow}><Text style={styles.price}>{money(product.price)}</Text>{product.discountPercent > 0 && <View style={styles.offer}><Text style={styles.offerText}>Oferta web -{product.discountPercent}%</Text></View>}</View>
+      {!!product.description && <Text style={styles.description}>{product.description}</Text>}
+      {Object.keys(product.specifications ?? {}).length > 0 && <View style={styles.specifications}>
+        {Object.entries(product.specifications).map(([label, value]) => <View key={label} style={styles.specification}>
+          <Text style={styles.specLabel}>{label}</Text><Text style={styles.specValue}>{value}</Text>
+        </View>)}
+      </View>}
 
       <View style={[styles.stockCard, low && styles.stockCardLow]}>
         <View style={[styles.stockIcon, low && styles.stockIconLow]}>
@@ -64,6 +70,11 @@ const styles = StyleSheet.create({
   price: { color: colors.forest, fontSize: 24, fontWeight: "900" },
   offer: { borderRadius: 999, backgroundColor: colors.forest, paddingHorizontal: 9, paddingVertical: 5 },
   offerText: { color: colors.white, fontSize: 9, fontWeight: "900" },
+  description: { color: colors.muted, fontSize: 12, lineHeight: 19, marginTop: 15 },
+  specifications: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 15 },
+  specification: { minWidth: "46%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 11 },
+  specLabel: { color: colors.muted, fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
+  specValue: { color: colors.ink, fontSize: 12, fontWeight: "800", marginTop: 4 },
   stockCard: { flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, borderRadius: 18, padding: 13, marginTop: 22 },
   stockCardLow: { backgroundColor: colors.dangerSoft },
   stockIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: colors.white },

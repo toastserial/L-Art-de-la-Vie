@@ -3,6 +3,7 @@
     "name": "L'Art de la Vie POS",
     "slug": "l-art-de-la-vie-mobile",
     "version": "1.0.0",
+    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/lartdela.png",
     "userInterfaceStyle": "light",

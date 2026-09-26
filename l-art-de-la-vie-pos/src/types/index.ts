@@ -9,6 +9,8 @@ export interface Product {
   discountPercent: number;
   stock: number;
   minStock: number;
+  description: string;
+  specifications: Record<string, string>;
   image?: string;
 }
 

@@ -4,6 +4,7 @@ import { Product, Category } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,7 +20,7 @@ import { ProductPreviewDialog } from "@/components/ProductPreviewDialog";
 import { ListPagination } from "@/components/ListPagination";
 
 type ProductForm = Omit<Product, "id" | "code">;
-const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, discountPercent: 0, stock: 0, minStock: 3 };
+const emptyProduct: ProductForm = { name: "", category: "Decoración", price: 0, discountPercent: 0, stock: 0, minStock: 3, description: "", specifications: {} };
 
 export default function Inventory() {
   const { products, categories, movements, addProduct, updateProduct, deleteProduct, addMovement, addCategory } = useStore();
@@ -61,7 +62,7 @@ export default function Inventory() {
     setEditingProduct(null); setImageFile(null); setImagePreview(undefined);
     setForm({ ...emptyProduct, category: categories[0] }); setDialogOpen(true);
   };
-  const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, discountPercent: p.discountPercent, stock: p.stock, minStock: p.minStock, image: p.image }); setDialogOpen(true); };
+  const openEdit = (p: Product) => { setEditingProduct(p); setImageFile(null); setImagePreview(p.image); setForm({ name: p.name, category: p.category, price: p.price, discountPercent: p.discountPercent, stock: p.stock, minStock: p.minStock, description: p.description ?? "", specifications: p.specifications ?? {}, image: p.image }); setDialogOpen(true); };
 
   const handleImage = (file?: File) => {
     if (!file) return;
@@ -260,7 +261,7 @@ export default function Inventory() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[620px]">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Editar Producto" : "Agregar Producto"}</DialogTitle>
           </DialogHeader>
@@ -295,6 +296,14 @@ export default function Inventory() {
               <div><Label>Stock Mín.</Label><Input type="number" min={0} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} /></div>
             </div>
             {form.discountPercent > 0 && <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary"><span className="font-semibold">Vista previa en tienda:</span> L {(form.price * (1 - form.discountPercent / 100)).toFixed(2)} <span className="text-muted-foreground line-through">antes L {form.price.toFixed(2)}</span></div>}
+            <div><Label>Descripción para la tienda</Label><Textarea maxLength={1000} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descripción breve del producto" /></div>
+            <div>
+              <Label>Especificaciones</Label>
+              <p className="mb-3 mt-1 text-xs text-muted-foreground">El análisis fotográfico se realiza solamente en la app móvil; aquí puedes corregir sus sugerencias.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {["Marca", "Color", "Material", "Tipo"].map((key) => <div key={key}><Label className="text-xs">{key}</Label><Input value={form.specifications[key] ?? ""} onChange={(e) => setForm({ ...form, specifications: { ...form.specifications, [key]: e.target.value } })} placeholder="Opcional" /></div>)}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

@@ -16,6 +16,10 @@ function normalize(raw: unknown): Product | null {
   const stock = typeof r.stock === "number" ? r.stock : Number(r.stock);
   const image = typeof r.image === "string" ? r.image : null;
   const category = isValidCategory(r.category) ? r.category : "Varios";
+  const description = typeof r.description === "string" ? r.description.slice(0, 1000) : "";
+  const specifications = r.specifications && typeof r.specifications === "object" && !Array.isArray(r.specifications)
+    ? Object.fromEntries(Object.entries(r.specifications as Record<string, unknown>).filter(([, value]) => typeof value === "string").slice(0, 12)) as Record<string, string>
+    : {};
   if (!id || !name || !Number.isFinite(price) || !Number.isFinite(stock)) {
     return null;
   }
@@ -28,6 +32,8 @@ function normalize(raw: unknown): Product | null {
     stock: Math.max(0, Math.floor(stock)),
     image: image ?? "",
     category,
+    description,
+    specifications,
   };
 }
 

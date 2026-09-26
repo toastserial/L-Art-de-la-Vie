@@ -35,7 +35,10 @@ export function ProductQuickView({ product, onClose, onAdd }: ProductQuickViewPr
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--gold)]">Vista de la pieza</p>
             <h2 className="mt-4 font-serif text-4xl leading-tight text-[color:var(--ink)]">{product.name}</h2>
             <div className="mt-5 flex flex-wrap items-baseline gap-3"><p className="text-2xl font-semibold text-[color:var(--forest)]">{formatL(product.price)}</p>{product.originalPrice ? <><span className="text-sm text-[color:var(--ink-muted)] line-through">{formatL(product.originalPrice)}</span><span className="rounded-full bg-[color:var(--forest)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--cream)]">-{product.discountPercent}%</span></> : null}</div>
-            <p className="mt-7 text-sm leading-7 text-[color:var(--ink-muted)]">Una pieza seleccionada por L’Art de la Vie para transformar tus espacios y acompañar momentos especiales.</p>
+            <p className="mt-7 text-sm leading-7 text-[color:var(--ink-muted)]">{product.description || "Una pieza seleccionada por L’Art de la Vie para transformar tus espacios y acompañar momentos especiales."}</p>
+            {Object.keys(product.specifications).length > 0 && <dl className="mt-6 grid grid-cols-2 gap-2">
+              {Object.entries(product.specifications).map(([label, value]) => <div key={label} className="rounded-2xl border border-[color:var(--border)] bg-white/55 px-4 py-3"><dt className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">{label}</dt><dd className="mt-1 text-sm font-medium text-[color:var(--ink)]">{value}</dd></div>)}
+            </dl>}
 
             <div className="mt-8 flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--cream)]/55 p-4">
               <div><p className="text-sm font-semibold text-[color:var(--ink)]">Disponibilidad</p><p className="mt-1 text-xs text-[color:var(--ink-muted)]">{product.stock > 0 ? `${product.stock} unidades` : "Agotado por ahora"}</p></div>

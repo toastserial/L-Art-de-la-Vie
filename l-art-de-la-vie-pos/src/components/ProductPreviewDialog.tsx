@@ -43,6 +43,10 @@ export function ProductPreviewDialog({ product, onOpenChange, onEdit, onAdd }: P
             </DialogHeader>
 
             <div className="mt-7 flex flex-wrap items-center gap-3"><p className="text-3xl font-bold text-primary">L {product.price.toFixed(2)}</p>{product.discountPercent > 0 && <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Oferta tienda web: -{product.discountPercent}%</span>}</div>
+            {product.description && <p className="mt-5 text-sm leading-6 text-muted-foreground">{product.description}</p>}
+            {Object.keys(product.specifications ?? {}).length > 0 && <div className="mt-5 grid grid-cols-2 gap-2">
+              {Object.entries(product.specifications).map(([label, value]) => <div key={label} className="rounded-xl border bg-muted/30 px-3 py-2"><p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p><p className="mt-1 text-sm font-medium">{value}</p></div>)}
+            </div>}
             <div className={`mt-6 rounded-2xl border p-4 ${lowStock ? "border-destructive/25 bg-destructive/5" : "border-primary/15 bg-primary/5"}`}>
               <div className="flex items-center gap-3">
                 {lowStock ? <PackageX className="h-6 w-6 text-destructive" /> : <PackageCheck className="h-6 w-6 text-primary" />}
