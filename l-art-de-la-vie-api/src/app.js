@@ -68,6 +68,21 @@ const productSpecifications = (value) => {
   if (entries.length > 12) throw httpError(400, "Solo se permiten 12 especificaciones por producto");
   return Object.fromEntries(entries.map(([key, item]) => [text(key, "Nombre de especificación", 50), text(String(item), "Valor de especificación", 160)]));
 };
+const legacyProductColumns = "id,code,name,category,price,discount_percent,stock,min_stock,image_url";
+const productColumns = `${legacyProductColumns},description,specifications`;
+const missingProductIntelligenceSchema = (error) => Boolean(error
+  && ["42703", "PGRST204"].includes(error.code)
+  && /description|specifications/i.test(`${error.message ?? ""} ${error.details ?? ""}`));
+const selectProductsWithFallback = async (buildQuery) => {
+  const result = await buildQuery(productColumns);
+  return missingProductIntelligenceSchema(result.error) ? buildQuery(legacyProductColumns) : result;
+};
+const writeProductWithFallback = async (values, write) => {
+  const result = await write(values);
+  if (!missingProductIntelligenceSchema(result.error)) return result;
+  const { description: _description, specifications: _specifications, ...legacyValues } = values;
+  return write(legacyValues);
+};
 const categoryName = (value) => text(value, "Categoría", 60).replace(/\s+/g, " ");
 const staffRoles = ["owner", "admin", "cashier"];
 const staffEmail = (value) => {
@@ -232,13 +247,13 @@ export function createApp() {
   }));
 
   app.get("/api/catalog", asyncRoute(async (_req, res) => {
-    const [productResult, categoryResult] = await Promise.all([supabase
+    const [productResult, categoryResult] = await Promise.all([selectProductsWithFallback((columns) => supabase
       .from("products")
-      .select("id,name,category,price,discount_percent,stock,image_url,description,specifications")
+      .select(columns.replace("code,", "").replace(",min_stock", ""))
       .eq("store_id", storeId)
       .eq("active", true)
       .order("name")
-      .limit(500), supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name")]);
+      .limit(500)), supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name")]);
     const products = unwrap(productResult);
     const categories = unwrap(categoryResult).map((category) => category.name);
     res.set("Cache-Control", "public, max-age=60, s-maxage=300");
@@ -283,7 +298,7 @@ export function createApp() {
     const results = await Promise.all([
       supabase.from("stores").select("timezone").eq("id", storeId).single(),
       supabase.from("cash_openings").select("id,business_date,opening_cash,note,created_at").eq("store_id", storeId).order("business_date", { ascending: false }).limit(370),
-      supabase.from("products").select("id,code,name,category,price,discount_percent,stock,min_stock,image_url,description,specifications").eq("store_id", storeId).eq("active", true).order("name").limit(2000),
+      selectProductsWithFallback((columns) => supabase.from("products").select(columns).eq("store_id", storeId).eq("active", true).order("name").limit(2000)),
       supabase.from("product_categories").select("name").eq("store_id", storeId).eq("active", true).order("name"),
       supabase.from("sales").select("id,folio,created_at,subtotal,discount,total,payment_method,cash_received,change_amount,sale_items(product_id,product_name,quantity,unit_price,subtotal)").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
       supabase.from("inventory_movements").select("id,product_id,product_name,type,quantity,note,created_at").eq("store_id", storeId).order("created_at", { ascending: false }).limit(500),
@@ -422,7 +437,8 @@ export function createApp() {
   app.post("/api/products", requireRole("owner", "admin"), asyncRoute(async (req, res) => {
     const values = { store_id: storeId, ...productValues(req.body) };
     await ensureCategory(values.category);
-    res.status(201).json(productFromDb(unwrap(await supabase.from("products").insert(values).select().single())));
+    const result = await writeProductWithFallback(values, (writeValues) => supabase.from("products").insert(writeValues).select().single());
+    res.status(201).json(productFromDb(unwrap(result)));
   }));
 
   app.post("/api/product-images", requireRole("owner", "admin"), imageLimiter, imageUpload.single("image"), asyncRoute(async (req, res) => {
@@ -480,7 +496,7 @@ export function createApp() {
     const productId = uuid(req.params.id, "Producto");
     const values = productValues(req.body);
     await ensureCategory(values.category);
-    const result = await supabase.from("products").update(values).eq("store_id", storeId).eq("id", productId).select().single();
+    const result = await writeProductWithFallback(values, (writeValues) => supabase.from("products").update(writeValues).eq("store_id", storeId).eq("id", productId).select().single());
     res.json(productFromDb(unwrap(result)));
   }));
 
