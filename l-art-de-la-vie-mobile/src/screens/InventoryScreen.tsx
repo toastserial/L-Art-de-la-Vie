@@ -121,20 +121,23 @@ export function InventoryScreen() {
     setAnalyzingImage(true);
     try {
       const result = await analyzeProductImage(pendingImage.uri, pendingImage.mimeType, pendingImage.fileName);
-      setForm(current => ({
-        ...current,
-        name: result.name || current.name,
-        category: result.category || current.category,
-        description: result.description || current.description,
-        brand: result.specifications.Marca || "",
-        color: result.specifications.Color || "",
-        material: result.specifications.Material || "",
-        productType: result.specifications.Tipo || "",
-      }));
-      setSuggestedCategory(result.suggestedCategory || null);
-      setAnalysisNote(result.analysisMode === "semantic"
-        ? `Análisis semántico listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`
-        : `Análisis básico listo · ${result.usage.remaining} disponibles este mes. Revisa especialmente tipo, color y material.`);
+      if (result.analysisMode === "semantic") {
+        setForm(current => ({
+          ...current,
+          name: result.name || current.name,
+          category: result.category || current.category,
+          description: result.description || current.description,
+          brand: result.specifications.Marca || "",
+          color: result.specifications.Color || "",
+          material: result.specifications.Material || "",
+          productType: result.specifications.Tipo || "",
+        }));
+        setSuggestedCategory(result.suggestedCategory || null);
+        setAnalysisNote(`Análisis semántico listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`);
+      } else {
+        setSuggestedCategory(null);
+        setAnalysisNote(`${result.semanticError || "Gemini no está disponible."} No se aplicaron las sugerencias básicas porque podrían ser incorrectas.`);
+      }
     } catch (reason) {
       setAnalysisNote(null);
       setSuggestedCategory(null);

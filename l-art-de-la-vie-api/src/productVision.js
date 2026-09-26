@@ -180,7 +180,11 @@ async function analyzeWithGemini(apiKey, buffer, categories, mimeType) {
     })
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Gemini ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`Gemini ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   const text = body.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text;
   const result = JSON.parse(text || "{}");
   const category = categories.includes(result.category) ? result.category : (categories.find((item) => fold(item) === "varios") ?? categories[0] ?? "Varios");
@@ -224,6 +228,16 @@ export async function analyzeProductPhoto(apiKey, buffer, categories, mimeType =
     return { ...(await analyzeWithGemini(geminiKey, buffer, categories, mimeType)), analysisMode: "semantic" };
   } catch (error) {
     console.warn({ event: "gemini_product_analysis_fallback", message: error instanceof Error ? error.message : "unknown" });
+    const status = Number(error?.status ?? 0);
+    const semanticError = [401, 403].includes(status)
+      ? `Gemini no autorizó la clave (${status}). Revisa GEMINI_API_KEY y sus permisos.`
+      : status === 429
+        ? "Gemini alcanzó su cuota temporal (429). Revisa el uso y la facturación en Google AI Studio."
+        : status === 404
+          ? "El modelo de Gemini no está disponible para esta clave (404)."
+          : status === 400
+            ? "Gemini rechazó la solicitud (400). Revisa que la clave pertenezca a Gemini API."
+            : `Gemini no respondió correctamente${status ? ` (${status})` : ""}.`;
+    return { ...(await analyzeWithCloudVision(apiKey, buffer, categories)), analysisMode: "basic", semanticError };
   }
-  return { ...(await analyzeWithCloudVision(apiKey, buffer, categories)), analysisMode: "basic" };
 }
