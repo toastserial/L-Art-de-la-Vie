@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef, useState } from "react";
 import { Alert, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -10,6 +11,7 @@ import { colors, shadow } from "../theme";
 
 export function LoginScreen() {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
+  const googleSignInAvailable = Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,17 +81,19 @@ export function LoginScreen() {
           <Field label="Contraseña" value={password} onChangeText={setPassword} onFocus={keepActiveFieldVisible} secureTextEntry placeholder="Tu contraseña" onSubmitEditing={login} style={styles.input} />
           <Button title="Continuar" icon="arrow-right" onPress={login} loading={busy} style={styles.loginButton} />
           <Button title="¿Olvidaste tu contraseña?" variant="ghost" onPress={recover} compact style={styles.recover} />
-          <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>O CONTINÚA CON</Text><View style={styles.dividerLine} /></View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Continuar con Google"
-            disabled={busy || googleBusy}
-            onPress={loginWithGoogle}
-            style={({ pressed }) => [styles.googleButton, (pressed || busy || googleBusy) && styles.googleButtonPressed]}
-          >
-            <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
-            <Text style={styles.googleText}>{googleBusy ? "Abriendo Google…" : "Continuar con Google"}</Text>
-          </Pressable>
+          {googleSignInAvailable && <>
+            <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>O CONTINÚA CON</Text><View style={styles.dividerLine} /></View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continuar con Google"
+              disabled={busy || googleBusy}
+              onPress={loginWithGoogle}
+              style={({ pressed }) => [styles.googleButton, (pressed || busy || googleBusy) && styles.googleButtonPressed]}
+            >
+              <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
+              <Text style={styles.googleText}>{googleBusy ? "Abriendo Google…" : "Continuar con Google"}</Text>
+            </Pressable>
+          </>}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
