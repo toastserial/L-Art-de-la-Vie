@@ -81,19 +81,18 @@ export function LoginScreen() {
           <Field label="Contraseña" value={password} onChangeText={setPassword} onFocus={keepActiveFieldVisible} secureTextEntry placeholder="Tu contraseña" onSubmitEditing={login} style={styles.input} />
           <Button title="Continuar" icon="arrow-right" onPress={login} loading={busy} style={styles.loginButton} />
           <Button title="¿Olvidaste tu contraseña?" variant="ghost" onPress={recover} compact style={styles.recover} />
-          {googleSignInAvailable && <>
-            <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>O CONTINÚA CON</Text><View style={styles.dividerLine} /></View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Continuar con Google"
-              disabled={busy || googleBusy}
-              onPress={loginWithGoogle}
-              style={({ pressed }) => [styles.googleButton, (pressed || busy || googleBusy) && styles.googleButtonPressed]}
-            >
-              <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
-              <Text style={styles.googleText}>{googleBusy ? "Abriendo Google…" : "Continuar con Google"}</Text>
-            </Pressable>
-          </>}
+          <View style={styles.divider}><View style={styles.dividerLine} /><Text style={styles.dividerText}>O CONTINÚA CON</Text><View style={styles.dividerLine} /></View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continuar con Google"
+            accessibilityHint={googleSignInAvailable ? undefined : "Disponible en la aplicación instalada"}
+            disabled={busy || googleBusy || !googleSignInAvailable}
+            onPress={loginWithGoogle}
+            style={({ pressed }) => [styles.googleButton, (pressed || busy || googleBusy || !googleSignInAvailable) && styles.googleButtonPressed]}
+          >
+            <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
+            <Text style={styles.googleText}>{googleBusy ? "Abriendo Google…" : googleSignInAvailable ? "Continuar con Google" : "Google disponible en la app instalada"}</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
