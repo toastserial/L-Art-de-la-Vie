@@ -50,6 +50,28 @@ const namedColors = [
   ["Morado", ["purple", "violet", "morado"]], ["Café", ["brown", "café", "coffee color"]]
 ];
 
+const colorHexes = new Map([
+  ["blanco", "#F5F5F2"], ["negro", "#1C1C1C"], ["gris", "#7C8580"],
+  ["plateado", "#B8BDC4"], ["beige", "#D8C3A5"], ["cafe", "#795548"],
+  ["dorado", "#C9A227"], ["rojo", "#D64545"], ["rosado", "#E88AAA"],
+  ["naranja", "#F28C28"], ["amarillo", "#F2C94C"], ["verde", "#2E7D4F"],
+  ["azul", "#2F64B5"], ["morado", "#7D4E9E"]
+]);
+
+const normalizeColorHex = (value, colorName = "") => {
+  const candidate = clean(value, 16).toUpperCase();
+  const full = candidate.match(/^#?([0-9A-F]{6})$/)?.[1];
+  if (full) return `#${full}`;
+  const short = candidate.match(/^#?([0-9A-F]{3})$/)?.[1];
+  if (short) return `#${short.split("").map((part) => part.repeat(2)).join("")}`;
+  const normalizedName = fold(colorName);
+  return [...colorHexes].find(([name]) => normalizedName.includes(name))?.[1] ?? "";
+};
+
+const rgbToHex = ({ red = 0, green = 0, blue = 0 } = {}) => `#${[red, green, blue]
+  .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, "0"))
+  .join("").toUpperCase()}`;
+
 const colorFromRgb = ({ red = 0, green = 0, blue = 0 }) => {
   const maximum = Math.max(red, green, blue), minimum = Math.min(red, green, blue);
   const brightness = (red + green + blue) / 3;
@@ -137,10 +159,12 @@ export function interpretVisionResult(result, categories) {
   const productType = findProductType(terms);
   const material = findMaterial(terms);
   const color = findColor(terms, result);
+  const dominantRgb = result?.imagePropertiesAnnotation?.dominantColors?.colors?.[0]?.color;
+  const colorHex = dominantRgb ? rgbToHex(dominantRgb) : normalizeColorHex("", color);
   const { category, suggestedCategory } = categoryChoice(categories, terms, productType);
   const name = uniqueName(productType, brand, result ?? {}, terms);
   const specifications = Object.fromEntries([
-    ["Marca", brand], ["Color", color], ["Material", material], ["Tipo", productType]
+    ["Marca", brand], ["Color", color], ["Color HEX", colorHex], ["Material", material], ["Tipo", productType]
   ].filter(([, value]) => value));
   const details = [color && `en color ${color.toLowerCase()}`, material && `fabricado en ${material.toLowerCase()}`].filter(Boolean);
   const description = productType ? `${productType}${brand ? ` marca ${brand}` : ""}${details.length ? `, ${details.join(" y ")}` : ""}, ideal para uso diario.` : "";
@@ -162,12 +186,13 @@ const productSchema = (categories) => ({
     description: { type: "string", description: "Una frase objetiva que explique qué es, para qué sirve y la variante visible, sin inventar beneficios." },
     brand: { type: "string", description: "Marca o fabricante realmente visible; vacío si no se puede leer." },
     color: { type: "string", description: "Color o combinación de colores del producto o su empaque principal, no del fondo." },
+    colorHex: { type: "string", description: "Código HEX aproximado del color principal en formato #RRGGBB; vacío solo si no hay color identificable." },
     material: { type: "string", description: "Material del objeto; para consumibles indica estado del contenido y material del envase, por ejemplo Líquido en envase de plástico." },
     productType: { type: "string", description: "Tipo concreto del producto en español." },
     visibleText: { type: "string", description: "Transcripción de las palabras útiles de marca, línea, variante, uso y cantidad que realmente se alcanzan a leer." },
     confidence: { type: "integer", minimum: 0, maximum: 100, description: "Confianza global; reduce el valor si el nombre exacto depende de una suposición." }
   },
-  required: ["name", "category", "suggestedCategory", "description", "brand", "color", "material", "productType", "visibleText", "confidence"]
+  required: ["name", "category", "suggestedCategory", "description", "brand", "color", "colorHex", "material", "productType", "visibleText", "confidence"]
 });
 
 const semanticPrompt = (categories) => `Eres un catalogador visual experto de productos de tienda. Analiza únicamente el producto principal centrado en la fotografía y responde en español.
@@ -176,7 +201,7 @@ RAZONA EN ESTE ORDEN:
 1. Lee cuidadosamente el logotipo y todas las palabras visibles del frente: marca, línea, variante, uso, aroma, modelo y cantidad. No confundas un eslogan con el tipo de producto.
 2. Combina el texto con la forma y el empaque para determinar qué producto es. Prioriza evidencia visible; usa conocimiento general solo para interpretar esa evidencia.
 3. Forma name como: tipo comercial específico + marca + línea o variante claramente visible. Evita nombres genéricos como producto, botella, packaged goods o solamente una palabra del rótulo.
-4. Determina color y material del producto principal. Para líquidos, cremas, alimentos u otros consumibles, material debe describir el contenido y el envase, por ejemplo "Líquido en envase de plástico". Para objetos sólidos, indica el material del objeto, no el de la mano, fondo o accesorio secundario.
+4. Determina color y material del producto principal. Devuelve también colorHex como la aproximación visual #RRGGBB del color principal. Para líquidos, cremas, alimentos u otros consumibles, material debe describir el contenido y el envase, por ejemplo "Líquido en envase de plástico". Para objetos sólidos, indica el material del objeto, no el de la mano, fondo o accesorio secundario.
 5. Si no puedes sostener un dato visualmente, usa "No identificado" o deja brand vacío; nunca inventes una marca, variante o composición.
 
 EJEMPLOS DEL CRITERIO, NO REGLAS PARA UN PRODUCTO ESPECÍFICO:
@@ -187,7 +212,7 @@ EJEMPLOS DEL CRITERIO, NO REGLAS PARA UN PRODUCTO ESPECÍFICO:
 
 La descripción debe ser breve, objetiva y sin precio. Elige exactamente una categoría existente de esta lista: ${categories.join(", ") || "Varios"}. Si ninguna es suficientemente precisa, conserva la mejor categoría existente y propón en suggestedCategory una categoría nueva, breve, plural y reutilizable. Nunca uses una marca o modelo como categoría.`;
 
-const jsonOnlyInstruction = "Devuelve exclusivamente un objeto JSON válido con estas claves exactas: name, category, suggestedCategory, description, brand, color, material, productType, visibleText, confidence. No uses Markdown ni agregues explicación fuera del JSON.";
+const jsonOnlyInstruction = "Devuelve exclusivamente un objeto JSON válido con estas claves exactas: name, category, suggestedCategory, description, brand, color, colorHex, material, productType, visibleText, confidence. No uses Markdown ni agregues explicación fuera del JSON.";
 
 const parseJsonResponse = (value) => {
   if (value && typeof value === "object") return value;
@@ -215,8 +240,10 @@ const normalizeSemanticResult = (result, categories) => {
   const rawSuggestion = clean(result.suggestedCategory, 60);
   const existingSuggestion = rawSuggestion && categories.find((item) => fold(item) === fold(rawSuggestion));
   const suggestedCategory = existingSuggestion ? "" : rawSuggestion;
+  const color = clean(result.color, 40);
+  const colorHex = normalizeColorHex(result.colorHex, color);
   const specifications = Object.fromEntries([
-    ["Marca", clean(result.brand, 60)], ["Color", clean(result.color, 40)],
+    ["Marca", clean(result.brand, 60)], ["Color", color], ["Color HEX", colorHex],
     ["Material", clean(result.material, 60)], ["Tipo", clean(result.productType, 80)]
   ].filter(([, value]) => value));
   const normalized = {

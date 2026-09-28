@@ -91,7 +91,7 @@ export function Sheet({ visible, onClose, title, children, footer, full = false 
             <Text style={styles.sheetTitle}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={12}><MaterialCommunityIcons name="close" size={25} color={colors.ink} /></Pressable>
           </View>
-          <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
+          <ScrollView style={styles.sheetScroll} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.sheetContent, Boolean(footer) ? styles.sheetContentWithFooter : undefined]}>{children}</ScrollView>
           {footer && <View style={styles.sheetFooter}>{footer}</View>}
         </View>
       </KeyboardAvoidingView>
@@ -136,14 +136,16 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.ink },
   emptyMessage: { marginTop: 5, color: colors.muted, textAlign: "center", lineHeight: 19 },
   overlay: { flex: 1, backgroundColor: "rgba(10,24,16,0.45)", justifyContent: "flex-end" },
-  sheetKeyboard: { width: "100%" },
+  sheetKeyboard: { width: "100%", flex: 1, justifyContent: "flex-end" },
   sheet: { maxHeight: "88%", minHeight: 220, backgroundColor: colors.cream, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden" },
   sheetFull: { maxHeight: "96%", height: "96%" },
   sheetHandle: { width: 42, height: 5, borderRadius: 3, backgroundColor: "#CBD0CC", alignSelf: "center", marginTop: 10 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.line },
   sheetTitle: { fontSize: 21, fontWeight: "900", color: colors.ink },
+  sheetScroll: { flexShrink: 1 },
   sheetContent: { padding: 20, paddingBottom: 30 },
-  sheetFooter: { padding: 16, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.white },
+  sheetContentWithFooter: { paddingBottom: 112 },
+  sheetFooter: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 10, elevation: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.white },
   segmentRow: { gap: 8, paddingRight: 18 },
   segment: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   segmentActive: { backgroundColor: colors.forest, borderColor: colors.forest },

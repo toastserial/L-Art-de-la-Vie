@@ -12,10 +12,18 @@ import { colors, money, shortDate } from "../theme";
 import type { Category, Product } from "../types";
 import { ImageCropper, type CropSource, type CroppedImage } from "../components/ImageCropper";
 import { ProductPreviewSheet } from "../components/ProductPreviewSheet";
+import { colorHexForName, ProductColorPicker } from "../components/ProductColorPicker";
 
-interface ProductForm { name: string; category: Category; price: string; discountPercent: string; stock: string; minStock: string; description: string; brand: string; color: string; material: string; productType: string; image?: string }
+interface ProductForm { name: string; category: Category; price: string; discountPercent: string; stock: string; minStock: string; description: string; brand: string; color: string; colorHex: string; material: string; productType: string; image?: string }
 interface PendingImage { uri: string; width: number; height: number; mimeType?: string | null; fileName?: string | null }
-const blank: ProductForm = { name: "", category: "Decoración", price: "", discountPercent: "0", stock: "", minStock: "3", description: "", brand: "", color: "", material: "", productType: "" };
+const blank: ProductForm = { name: "", category: "Decoración", price: "", discountPercent: "0", stock: "", minStock: "3", description: "", brand: "", color: "", colorHex: "", material: "", productType: "" };
+
+function FormSectionTitle({ icon, title, subtitle }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; subtitle: string }) {
+  return <View style={styles.sectionHeading}>
+    <View style={styles.sectionIcon}><MaterialCommunityIcons name={icon} size={18} color={colors.forest} /></View>
+    <View style={styles.sectionCopy}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.sectionSubtitle}>{subtitle}</Text></View>
+  </View>;
+}
 
 export function InventoryScreen() {
   const { canManage } = useAuth();
@@ -30,6 +38,7 @@ export function InventoryScreen() {
   const [preparingImage, setPreparingImage] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [analysisNote, setAnalysisNote] = useState<string | null>(null);
+  const [analysisState, setAnalysisState] = useState<"success" | "error" | null>(null);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [creatingSuggestedCategory, setCreatingSuggestedCategory] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
@@ -55,9 +64,9 @@ export function InventoryScreen() {
   const openNew = () => {
     const firstCategory = categories[0];
     if (!firstCategory) { setCategoryOpen(true); return; }
-    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setSuggestedCategory(null); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
+    setEditing(null); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setAnalysisState(null); setSuggestedCategory(null); setForm({ ...blank, category: firstCategory }); setProductOpen(true);
   };
-  const openEdit = (product: Product) => { setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setSuggestedCategory(null); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), description: product.description ?? "", brand: product.specifications?.Marca ?? "", color: product.specifications?.Color ?? "", material: product.specifications?.Material ?? "", productType: product.specifications?.Tipo ?? "", image: product.image }); setProductOpen(true); };
+  const openEdit = (product: Product) => { const productColor = product.specifications?.Color ?? ""; setEditing(product); setPendingImage(null); setCropSource(null); setPreparingImage(false); setAnalyzingImage(false); setAnalysisNote(null); setAnalysisState(null); setSuggestedCategory(null); setForm({ name: product.name, category: product.category, price: String(product.price), discountPercent: String(product.discountPercent), stock: String(product.stock), minStock: String(product.minStock), description: product.description ?? "", brand: product.specifications?.Marca ?? "", color: productColor, colorHex: product.specifications?.["Color HEX"] ?? colorHexForName(productColor), material: product.specifications?.Material ?? "", productType: product.specifications?.Tipo ?? "", image: product.image }); setProductOpen(true); };
 
   const usePickedImage = (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets[0]) return;
@@ -69,6 +78,7 @@ export function InventoryScreen() {
     setPendingImage({ uri: image.uri, width: image.width, height: image.height, mimeType: image.mimeType, fileName: image.fileName });
     setForm(current => ({ ...current, image: image.uri }));
     setAnalysisNote(null);
+    setAnalysisState(null);
     setSuggestedCategory(null);
     setCropSource(null);
   };
@@ -129,17 +139,21 @@ export function InventoryScreen() {
           description: result.description || current.description,
           brand: result.specifications.Marca || "",
           color: result.specifications.Color || "",
+          colorHex: result.specifications["Color HEX"] || colorHexForName(result.specifications.Color || ""),
           material: result.specifications.Material || "",
           productType: result.specifications.Tipo || "",
         }));
         setSuggestedCategory(result.suggestedCategory || null);
         const provider = result.analysisProvider === "cloudflare" ? "Cloudflare" : "Gemini";
-        setAnalysisNote(`Análisis semántico con ${provider} listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`);
+        setAnalysisState("success");
+        setAnalysisNote(`${provider} completó las sugerencias. Límite interno: ${result.usage.remaining} de ${result.usage.limit} análisis disponibles este mes.`);
       } else {
         setSuggestedCategory(null);
+        setAnalysisState("error");
         setAnalysisNote(`${result.semanticError || "El análisis semántico no está disponible."} No se aplicaron las sugerencias básicas porque podrían ser incorrectas.`);
       }
     } catch (reason) {
+      setAnalysisState("error");
       setAnalysisNote(reason instanceof Error ? `${reason.message} Intenta nuevamente; no se modificó el formulario.` : "No se pudo analizar la foto. Intenta nuevamente.");
       setSuggestedCategory(null);
     } finally {
@@ -171,7 +185,7 @@ export function InventoryScreen() {
       let image = form.image;
       if (pendingImage) image = (await uploadProductImage(pendingImage.uri, pendingImage.mimeType, pendingImage.fileName)).url;
       const specifications = Object.fromEntries([
-        ["Marca", form.brand.trim()], ["Color", form.color.trim()], ["Material", form.material.trim()], ["Tipo", form.productType.trim()]
+        ["Marca", form.brand.trim()], ["Color", form.color.trim()], ["Color HEX", form.colorHex.trim().toUpperCase()], ["Material", form.material.trim()], ["Tipo", form.productType.trim()]
       ].filter(([, value]) => value));
       const values = { name: form.name.trim(), category: form.category, price, discountPercent, stock, minStock, description: form.description.trim(), specifications, image };
       if (editing) await updateProduct({ ...editing, ...values }); else await addProduct(values);
@@ -230,8 +244,8 @@ export function InventoryScreen() {
     <Sheet visible={productOpen} onClose={() => setProductOpen(false)} title={editing ? "Editar producto" : "Nuevo producto"} footer={<View style={styles.footerRow}>{editing && <Button title="Eliminar" variant="danger" icon="trash-can-outline" onPress={() => Alert.alert("Eliminar producto", `¿Desactivar ${editing.name}?`, [{ text: "Cancelar" }, { text: "Eliminar", style: "destructive", onPress: async () => { try { await deleteProduct(editing.id); setProductOpen(false); } catch (reason) { Alert.alert("No se eliminó", reason instanceof Error ? reason.message : "Intenta nuevamente"); } } }])} style={styles.footerDelete} />}<Button title="Guardar" icon="content-save-outline" onPress={saveProduct} loading={busy} style={styles.footerSave} /></View>}>
       <View style={styles.photoSection}>
         <Pressable onPress={() => form.image ? editCurrentPhoto() : selectPhoto()} disabled={preparingImage} style={styles.photoPicker}>
-          {form.image ? <Image source={{ uri: form.image }} style={styles.photoPreview} /> : <View style={styles.photoEmpty}><MaterialCommunityIcons name="camera-plus-outline" size={30} color={colors.forest} /><Text style={styles.photoEmptyTitle}>Agregar fotografía</Text><Text style={styles.photoEmptyCopy}>Cámara o galería</Text></View>}
-          <View style={styles.photoEdit}><MaterialCommunityIcons name="camera" size={17} color={colors.white} /></View>
+          {form.image ? <Image source={{ uri: form.image }} style={styles.photoPreview} /> : <View style={styles.photoEmpty}><MaterialCommunityIcons name="camera-plus-outline" size={30} color={colors.forest} /><Text style={styles.photoEmptyTitle}>Foto</Text></View>}
+          {form.image && <View style={styles.photoEdit}><MaterialCommunityIcons name="camera" size={17} color={colors.white} /></View>}
         </Pressable>
         <View style={styles.photoHelp}>
           <Text style={styles.photoTitle}>{form.image ? "Fotografía seleccionada" : "Imagen opcional"}</Text>
@@ -240,26 +254,43 @@ export function InventoryScreen() {
             <Button title={form.image ? "Cambiar" : "Agregar"} icon="image-plus" variant="secondary" compact onPress={selectPhoto} />
             {form.image && <Button title="Reencuadrar" icon="crop" variant="ghost" compact loading={preparingImage} onPress={() => editCurrentPhoto()} />}
           </View>
-          {form.image && <Pressable onPress={() => { setPendingImage(null); setAnalysisNote(null); setSuggestedCategory(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
+          {form.image && <Pressable onPress={() => { setPendingImage(null); setAnalysisNote(null); setAnalysisState(null); setSuggestedCategory(null); setForm(current => ({ ...current, image: undefined })); }}><Text style={styles.removePhoto}>Quitar fotografía</Text></Pressable>}
         </View>
       </View>
       {pendingImage && <Button title="Analizar y sugerir datos" icon="creation" variant="secondary" onPress={analyzePhoto} loading={analyzingImage} style={styles.analyzeButton} />}
-      {analysisNote && <View style={styles.analysisCard}><MaterialCommunityIcons name="check-decagram-outline" size={21} color={colors.forest} /><Text style={styles.analysisText}>{analysisNote}</Text></View>}
+      {analysisNote && <View style={[styles.analysisCard, analysisState === "error" && styles.analysisCardError]}>
+        <View style={[styles.analysisIcon, analysisState === "error" && styles.analysisIconError]}><MaterialCommunityIcons name={analysisState === "error" ? "alert-outline" : "check-bold"} size={17} color={analysisState === "error" ? colors.danger : colors.forest} /></View>
+        <View style={styles.analysisCopy}><Text style={[styles.analysisTitle, analysisState === "error" && styles.analysisTitleError]}>{analysisState === "error" ? "No se aplicaron cambios" : "Sugerencias aplicadas"}</Text><Text style={[styles.analysisText, analysisState === "error" && styles.analysisTextError]}>{analysisNote}</Text></View>
+      </View>}
       {suggestedCategory && <View style={styles.categorySuggestionCard}>
-        <View style={styles.categorySuggestionCopy}><Text style={styles.categorySuggestionTitle}>Categoría sugerida: {suggestedCategory}</Text><Text style={styles.categorySuggestionText}>No existe todavía. Créala para usarla en este producto y en futuros análisis.</Text></View>
+        <View style={styles.categorySuggestionHeader}><View style={styles.categorySuggestionIcon}><MaterialCommunityIcons name="folder-star-outline" size={19} color={colors.forest} /></View><View style={styles.categorySuggestionCopy}><Text style={styles.categorySuggestionLabel}>NUEVA CATEGORÍA</Text><Text style={styles.categorySuggestionTitle}>{suggestedCategory}</Text><Text style={styles.categorySuggestionText}>Puedes crearla y usarla ahora.</Text></View></View>
         <Button title="Crear y usar" icon="folder-plus-outline" compact onPress={createSuggestedCategory} loading={creatingSuggestedCategory} />
       </View>}
-      <Field label="Nombre" value={form.name} onChangeText={name => setForm(current => ({ ...current, name }))} placeholder="Nombre del producto" />
-      <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
-      <View style={styles.fieldSpacer} />
-      <Field label="Precio" value={form.price} onChangeText={price => setForm(current => ({ ...current, price }))} keyboardType="decimal-pad" placeholder="0.00" />
-      <Field label="Oferta tienda web (%)" value={form.discountPercent} onChangeText={discountPercent => setForm(current => ({ ...current, discountPercent }))} keyboardType="decimal-pad" placeholder="0" /><Text style={styles.offerHelp}>El descuento se muestra en la tienda web; el precio de caja no cambia.</Text>
-      <View style={styles.twoFields}><View style={styles.half}><Field label="Existencias" value={form.stock} onChangeText={stock => setForm(current => ({ ...current, stock }))} keyboardType="number-pad" placeholder="0" /></View><View style={styles.half}><Field label="Stock mínimo" value={form.minStock} onChangeText={minStock => setForm(current => ({ ...current, minStock }))} keyboardType="number-pad" placeholder="3" /></View></View>
-      <Field label="Descripción para la tienda" value={form.description} onChangeText={description => setForm(current => ({ ...current, description }))} placeholder="Describe el producto en pocas palabras" multiline maxLength={1000} />
-      <Text style={styles.specTitle}>Especificaciones</Text>
-      <Text style={styles.specHelp}>Google puede sugerirlas desde la foto; puedes corregirlas o llenarlas manualmente.</Text>
-      <View style={styles.twoFields}><View style={styles.half}><Field label="Marca" value={form.brand} onChangeText={brand => setForm(current => ({ ...current, brand }))} placeholder="Opcional" /></View><View style={styles.half}><Field label="Color" value={form.color} onChangeText={color => setForm(current => ({ ...current, color }))} placeholder="Opcional" /></View></View>
-      <View style={styles.twoFields}><View style={styles.half}><Field label="Material" value={form.material} onChangeText={material => setForm(current => ({ ...current, material }))} placeholder="Opcional" /></View><View style={styles.half}><Field label="Tipo" value={form.productType} onChangeText={productType => setForm(current => ({ ...current, productType }))} placeholder="Opcional" /></View></View>
+
+      <View style={styles.formSection}>
+        <FormSectionTitle icon="tag-outline" title="Datos del producto" subtitle="Nombre y organización dentro del inventario." />
+        <Field label="Nombre" value={form.name} onChangeText={name => setForm(current => ({ ...current, name }))} placeholder="Nombre del producto" />
+        <Text style={styles.label}>Categoría</Text><Segmented values={categoryOptions} value={form.category} onChange={category => setForm(current => ({ ...current, category }))} />
+      </View>
+
+      <View style={styles.formSection}>
+        <FormSectionTitle icon="cash-register" title="Precio e inventario" subtitle="Valores que controlan venta y existencias." />
+        <View style={styles.twoFields}><View style={styles.half}><Field label="Precio" value={form.price} onChangeText={price => setForm(current => ({ ...current, price }))} keyboardType="decimal-pad" placeholder="0.00" /></View><View style={styles.half}><Field label="Oferta web (%)" value={form.discountPercent} onChangeText={discountPercent => setForm(current => ({ ...current, discountPercent }))} keyboardType="decimal-pad" placeholder="0" /></View></View>
+        <Text style={styles.offerHelp}>La oferta solo cambia el precio mostrado en la tienda web.</Text>
+        <View style={styles.twoFields}><View style={styles.half}><Field label="Existencias" value={form.stock} onChangeText={stock => setForm(current => ({ ...current, stock }))} keyboardType="number-pad" placeholder="0" /></View><View style={styles.half}><Field label="Stock mínimo" value={form.minStock} onChangeText={minStock => setForm(current => ({ ...current, minStock }))} keyboardType="number-pad" placeholder="3" /></View></View>
+      </View>
+
+      <View style={styles.formSection}>
+        <FormSectionTitle icon="storefront-outline" title="Tienda en línea" subtitle="Información que verá el cliente." />
+        <Field label="Descripción" value={form.description} onChangeText={description => setForm(current => ({ ...current, description }))} placeholder="Describe el producto en pocas palabras" multiline maxLength={1000} />
+      </View>
+
+      <View style={styles.formSection}>
+        <FormSectionTitle icon="shape-outline" title="Especificaciones" subtitle="Puedes corregir lo sugerido por la fotografía." />
+        <View style={styles.twoFields}><View style={styles.half}><Field label="Marca" value={form.brand} onChangeText={brand => setForm(current => ({ ...current, brand }))} placeholder="Opcional" /></View><View style={styles.half}><Field label="Tipo" value={form.productType} onChangeText={productType => setForm(current => ({ ...current, productType }))} placeholder="Ej. Gorra" /></View></View>
+        <Field label="Material" value={form.material} onChangeText={material => setForm(current => ({ ...current, material }))} placeholder="Ej. Algodón" />
+        <ProductColorPicker name={form.color} hex={form.colorHex} onChange={(color, colorHex) => setForm(current => ({ ...current, color, colorHex }))} />
+      </View>
     </Sheet>
 
     <Sheet visible={movementOpen} onClose={() => setMovementOpen(false)} title="Ajustar inventario" footer={<Button title="Registrar movimiento" icon="check" onPress={saveMovement} loading={busy} />}>
@@ -285,7 +316,7 @@ export function InventoryScreen() {
 const styles = StyleSheet.create({
   addButton: { width: 47, height: 47, borderRadius: 16, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" }, search: { marginTop: 16 }, list: { padding: 4 }, movements: { marginTop: 16 },
   categoryButton: { alignSelf: "flex-start", marginTop: 10 }, categoryHelp: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 10 },
-  offerHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: -9, marginBottom: 14 },
+  offerHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: -8, marginBottom: 14 },
   row: { minHeight: 84, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 10 }, border: { borderTopWidth: 1, borderTopColor: colors.line },
   initial: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.forestSoft, alignItems: "center", justifyContent: "center" }, outIcon: { backgroundColor: colors.dangerSoft }, initialText: { color: colors.forest, fontSize: 18, fontWeight: "900" },
   productThumb: { width: 48, height: 48, borderRadius: 15, backgroundColor: colors.forestSoft },
@@ -300,10 +331,26 @@ const styles = StyleSheet.create({
   photoEdit: { position: "absolute", right: 7, bottom: 7, width: 30, height: 30, borderRadius: 10, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center" },
   photoHelp: { flex: 1 }, photoTitle: { color: colors.ink, fontWeight: "800", fontSize: 13 }, photoCopy: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 }, photoActions: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 }, removePhoto: { color: colors.danger, fontSize: 11, fontWeight: "800", marginTop: 9 },
   analyzeButton: { marginTop: -7, marginBottom: 14 },
-  analysisCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, padding: 13, marginBottom: 17 },
-  analysisText: { flex: 1, color: colors.forest, fontSize: 11, lineHeight: 17, fontWeight: "700" },
-  categorySuggestionCard: { borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 13, marginBottom: 17, gap: 11 },
-  categorySuggestionCopy: { gap: 3 }, categorySuggestionTitle: { color: colors.ink, fontSize: 13, fontWeight: "900" }, categorySuggestionText: { color: colors.muted, fontSize: 10, lineHeight: 15 },
-  specTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginTop: 2 },
-  specHelp: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 4, marginBottom: 13 },
+  analysisCard: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 17, borderWidth: 1, borderColor: "#CFE0D5", backgroundColor: colors.forestSoft, padding: 12, marginBottom: 14 },
+  analysisCardError: { borderColor: "#F3C7C2", backgroundColor: colors.dangerSoft },
+  analysisIcon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#D4E8DB" },
+  analysisIconError: { backgroundColor: "#F7D6D2" },
+  analysisCopy: { flex: 1 },
+  analysisTitle: { color: colors.forest, fontSize: 12, fontWeight: "900" },
+  analysisTitleError: { color: colors.danger },
+  analysisText: { color: colors.forestLight, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  analysisTextError: { color: colors.danger },
+  categorySuggestionCard: { borderRadius: 18, borderWidth: 1, borderColor: "#D9E3DC", backgroundColor: colors.white, padding: 13, marginBottom: 14, gap: 11 },
+  categorySuggestionHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  categorySuggestionIcon: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: colors.forestSoft },
+  categorySuggestionCopy: { flex: 1, gap: 1 },
+  categorySuggestionLabel: { color: colors.forestLight, fontSize: 8, fontWeight: "900", letterSpacing: 1.1 },
+  categorySuggestionTitle: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  categorySuggestionText: { color: colors.muted, fontSize: 10, lineHeight: 14 },
+  formSection: { borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 15, marginBottom: 14 },
+  sectionHeading: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
+  sectionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.forestSoft },
+  sectionCopy: { flex: 1 },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "900" },
+  sectionSubtitle: { color: colors.muted, fontSize: 9, lineHeight: 14, marginTop: 2 },
 });

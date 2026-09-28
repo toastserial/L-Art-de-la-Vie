@@ -15,6 +15,8 @@ interface ProductPreviewSheetProps {
 export function ProductPreviewSheet({ product, onClose, primaryLabel, primaryIcon = "pencil-outline", onPrimary }: ProductPreviewSheetProps) {
   if (!product) return null;
   const low = product.stock <= product.minStock;
+  const colorHex = /^#[0-9A-F]{6}$/i.test(product.specifications?.["Color HEX"] ?? "") ? product.specifications["Color HEX"] : null;
+  const visibleSpecifications = Object.entries(product.specifications ?? {}).filter(([label]) => label !== "Color HEX");
 
   return (
     <Sheet
@@ -37,9 +39,9 @@ export function ProductPreviewSheet({ product, onClose, primaryLabel, primaryIco
       <Text style={styles.name}>{product.name}</Text>
       <View style={styles.priceRow}><Text style={styles.price}>{money(product.price)}</Text>{product.discountPercent > 0 && <View style={styles.offer}><Text style={styles.offerText}>Oferta web -{product.discountPercent}%</Text></View>}</View>
       {!!product.description && <Text style={styles.description}>{product.description}</Text>}
-      {Object.keys(product.specifications ?? {}).length > 0 && <View style={styles.specifications}>
-        {Object.entries(product.specifications).map(([label, value]) => <View key={label} style={styles.specification}>
-          <Text style={styles.specLabel}>{label}</Text><Text style={styles.specValue}>{value}</Text>
+      {visibleSpecifications.length > 0 && <View style={styles.specifications}>
+        {visibleSpecifications.map(([label, value]) => <View key={label} style={styles.specification}>
+          <Text style={styles.specLabel}>{label}</Text><View style={styles.specValueRow}>{label === "Color" && colorHex && <View style={[styles.colorSwatch, { backgroundColor: colorHex }]} />}<Text style={styles.specValue}>{value}</Text>{label === "Color" && colorHex && <Text style={styles.specHex}>{colorHex}</Text>}</View>
         </View>)}
       </View>}
 
@@ -74,7 +76,10 @@ const styles = StyleSheet.create({
   specifications: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 15 },
   specification: { minWidth: "46%", flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 11 },
   specLabel: { color: colors.muted, fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
-  specValue: { color: colors.ink, fontSize: 12, fontWeight: "800", marginTop: 4 },
+  specValueRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  colorSwatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: "rgba(0,0,0,0.12)" },
+  specValue: { color: colors.ink, fontSize: 12, fontWeight: "800" },
+  specHex: { color: colors.muted, fontSize: 9, fontWeight: "700" },
   stockCard: { flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.forestSoft, borderRadius: 18, padding: 13, marginTop: 22 },
   stockCardLow: { backgroundColor: colors.dangerSoft },
   stockIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: colors.white },
