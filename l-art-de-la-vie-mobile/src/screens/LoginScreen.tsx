@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Constants, { ExecutionEnvironment } from "expo-constants";
+import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef, useState } from "react";
 import { Alert, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -11,7 +11,7 @@ import { colors, shadow } from "../theme";
 
 export function LoginScreen() {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
-  const googleSignInAvailable = Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+  const googleSignInAvailable = Constants.expoGoConfig == null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

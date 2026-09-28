@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import * as AuthSession from "expo-auth-session";
-import Constants, { ExecutionEnvironment } from "expo-constants";
+import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const signInWithGoogle = async () => {
-    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    if (Constants.expoGoConfig != null) {
       throw new Error("Google no puede regresar correctamente desde Expo Go. Abre la compilación nativa de L'Art con npm run android:native o instala la APK.");
     }
     // `native` evita que un entorno de desarrollo sustituya el retorno del
