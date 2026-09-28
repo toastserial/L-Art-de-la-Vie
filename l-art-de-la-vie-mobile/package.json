@@ -23,8 +23,9 @@
     "react-native-url-polyfill": "^3.0.0"
   },
   "scripts": {
-    "start": "expo start",
-    "start:clear": "expo start --clear",
+    "start": "expo start --dev-client",
+    "start:clear": "expo start --dev-client --clear",
+    "start:expo-go": "expo start --go",
     "android": "expo run:android",
     "android:native": "set \"JAVA_HOME=C:\\Program Files\\Java\\jdk-21\"&& expo run:android",
     "ios": "expo run:ios",

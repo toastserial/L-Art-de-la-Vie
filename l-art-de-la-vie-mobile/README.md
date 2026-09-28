@@ -42,23 +42,27 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=TU_LLAVE_PUBLICA
 
 Nunca coloques `SUPABASE_SERVICE_ROLE_KEY` en la app. Esa llave solamente pertenece al backend.
 
-## Probar en un teléfono
+## Probar Google y la app completa
 
-1. Instala **Expo Go** desde Play Store o App Store.
-2. Ejecuta dentro de esta carpeta:
+Google OAuth necesita la compilación nativa porque Expo Go no puede registrar el esquema `lartdelavie://`. La primera vez, con el emulador o teléfono Android conectado, ejecuta:
 
 ```bash
 npm install
+npm run android:native
+```
+
+Después de instalarla una vez, inicia siempre el servidor para la app nativa con:
+
+```bash
 npm start
 ```
 
-3. Conecta teléfono y computadora a la misma red Wi-Fi.
-4. Escanea el QR mostrado por Expo.
+Al pulsar `a`, la terminal debe mostrar una dirección que comienza con `lartdelavie://expo-development-client/`. Si muestra `exp://`, abrió Expo Go y Google no podrá regresar a la app.
 
-Si la red bloquea la conexión:
+Expo Go queda disponible únicamente para revisar pantallas que no usan Google:
 
 ```bash
-npx expo start --tunnel
+npm run start:expo-go
 ```
 
 ## Verificación
