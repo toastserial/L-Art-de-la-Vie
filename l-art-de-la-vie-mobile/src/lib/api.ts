@@ -40,6 +40,7 @@ export interface ProductImageAnalysis {
   visibleText: string;
   confidence: number | null;
   analysisMode: "semantic" | "basic";
+  analysisProvider: "cloudflare" | "gemini" | "cloud-vision";
   semanticError?: string;
   usage: { used: number; limit: number; remaining: number };
 }

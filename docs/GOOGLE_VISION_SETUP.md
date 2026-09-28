@@ -1,5 +1,7 @@
 # Análisis de productos con Google Cloud Vision
 
+> Esta integración ahora es un respaldo opcional. Para usar el análisis semántico principal sin habilitar facturación de Google, sigue la [guía de Cloudflare Workers AI](CLOUDFLARE_WORKERS_AI_SETUP.md).
+
 La función está diseñada solamente para la app móvil del personal. La fotografía se envía al backend, el backend consulta Google y devuelve sugerencias editables. El producto no se guarda hasta que una persona revise y pulse **Guardar**.
 
 ## Costo esperado

@@ -563,6 +563,7 @@ components:
         visibleText: { type: string }
         confidence: { type: integer, nullable: true, minimum: 0, maximum: 100 }
         analysisMode: { type: string, enum: [semantic, basic] }
+        analysisProvider: { type: string, enum: [cloudflare, gemini, cloud-vision] }
         semanticError: { type: string }
         usage:
           type: object

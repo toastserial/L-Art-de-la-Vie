@@ -17,6 +17,8 @@ Configuración de acceso privado con Google: [`docs/GOOGLE_SSO.md`](docs/GOOGLE_
 
 Preparación legal y técnica de factura CAI: [`docs/CAI_HONDURAS.md`](docs/CAI_HONDURAS.md).
 
+Análisis gratuito de fotografías con Cloudflare Workers AI: [`docs/CLOUDFLARE_WORKERS_AI_SETUP.md`](docs/CLOUDFLARE_WORKERS_AI_SETUP.md).
+
 ## Configuración inicial
 
 ### 1. Base de datos

@@ -133,10 +133,11 @@ export function InventoryScreen() {
           productType: result.specifications.Tipo || "",
         }));
         setSuggestedCategory(result.suggestedCategory || null);
-        setAnalysisNote(`Análisis semántico listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`);
+        const provider = result.analysisProvider === "cloudflare" ? "Cloudflare" : "Gemini";
+        setAnalysisNote(`Análisis semántico con ${provider} listo · ${result.usage.remaining} disponibles este mes. Revisa los datos antes de guardar.`);
       } else {
         setSuggestedCategory(null);
-        setAnalysisNote(`${result.semanticError || "Gemini no está disponible."} No se aplicaron las sugerencias básicas porque podrían ser incorrectas.`);
+        setAnalysisNote(`${result.semanticError || "El análisis semántico no está disponible."} No se aplicaron las sugerencias básicas porque podrían ser incorrectas.`);
       }
     } catch (reason) {
       setAnalysisNote(null);

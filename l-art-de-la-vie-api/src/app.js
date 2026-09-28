@@ -38,7 +38,10 @@ const imageUpload = multer({
     callback(allowed.includes(file.mimetype) ? null : httpError(400, "Formato de imagen no permitido"), allowed.includes(file.mimetype));
   }
 });
-const visionMonthlyLimit = Math.max(1, Math.min(1000, Number.parseInt(process.env.GOOGLE_VISION_MONTHLY_LIMIT ?? "100", 10) || 100));
+const visionMonthlyLimit = Math.max(1, Math.min(1000, Number.parseInt(
+  process.env.PRODUCT_ANALYSIS_MONTHLY_LIMIT ?? process.env.GOOGLE_VISION_MONTHLY_LIMIT ?? "100",
+  10
+) || 100));
 
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const firstRow = (value) => Array.isArray(value) ? value[0] : value;
@@ -456,7 +459,8 @@ export function createApp() {
   }));
 
   app.post("/api/product-image-analysis", requireRole("owner", "admin"), visionLimiter, imageUpload.single("image"), asyncRoute(async (req, res) => {
-    if (!process.env.GOOGLE_VISION_API_KEY) {
+    const cloudflareConfigured = Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN);
+    if (!cloudflareConfigured && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_VISION_API_KEY) {
       throw httpError(503, "El análisis inteligente aún no está configurado. Puedes completar el producto manualmente.", "VISION_NOT_CONFIGURED");
     }
     if (!req.file) throw httpError(400, "Selecciona una fotografía para analizar");
@@ -480,7 +484,7 @@ export function createApp() {
     const categories = unwrap(await supabase.from("product_categories")
       .select("name").eq("store_id", storeId).eq("active", true).order("name"))
       .map((category) => category.name);
-    const analysis = await analyzeProductPhoto(process.env.GOOGLE_VISION_API_KEY, req.file.buffer, categories, detected.mime);
+    const analysis = await analyzeProductPhoto(process.env.GOOGLE_VISION_API_KEY?.trim(), req.file.buffer, categories, detected.mime);
     const nextUsed = used + 1;
     unwrap(await supabase.from("product_vision_usage").upsert({
       store_id: storeId,
