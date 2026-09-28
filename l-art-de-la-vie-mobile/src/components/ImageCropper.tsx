@@ -86,11 +86,11 @@ export function ImageCropper({ source, onCancel, onConfirm }: Props) {
       const cropPixels = Math.max(1, Math.min(Math.round(cropSize), source.width, source.height));
       const cropX = Math.max(0, Math.min(Math.round(originX), source.width - cropPixels));
       const cropY = Math.max(0, Math.min(Math.round(originY), source.height - cropPixels));
-      const outputSize = Math.min(1200, cropPixels);
+      const outputSize = Math.min(1600, cropPixels);
       const result = await manipulateAsync(source.uri, [
         { crop: { originX: cropX, originY: cropY, width: cropPixels, height: cropPixels } },
         { resize: { width: outputSize, height: outputSize } },
-      ], { compress: 0.78, format: SaveFormat.JPEG });
+      ], { compress: 0.9, format: SaveFormat.JPEG });
       onConfirm({ uri: result.uri, width: result.width, height: result.height, mimeType: "image/jpeg", fileName: `producto-${Date.now()}.jpg` });
     } catch {
       Alert.alert("No se pudo recortar", "Prueba seleccionando otra fotografía.");

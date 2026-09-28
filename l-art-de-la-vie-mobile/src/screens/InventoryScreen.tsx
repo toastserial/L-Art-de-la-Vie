@@ -101,13 +101,13 @@ export function InventoryScreen() {
   const takePhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) return Alert.alert("Permiso necesario", "Activa el permiso de cámara para fotografiar productos.");
-    usePickedImage(await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], cameraType: ImagePicker.CameraType.back, quality: 0.72 }));
+    usePickedImage(await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], cameraType: ImagePicker.CameraType.back, quality: 1 }));
   };
 
   const choosePhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return Alert.alert("Permiso necesario", "Activa el acceso a fotografías para escoger una imagen.");
-    usePickedImage(await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.72 }));
+    usePickedImage(await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 }));
   };
 
   const selectPhoto = () => Alert.alert("Fotografía del producto", "Elige de dónde obtener la imagen.", [
@@ -140,9 +140,8 @@ export function InventoryScreen() {
         setAnalysisNote(`${result.semanticError || "El análisis semántico no está disponible."} No se aplicaron las sugerencias básicas porque podrían ser incorrectas.`);
       }
     } catch (reason) {
-      setAnalysisNote(null);
+      setAnalysisNote(reason instanceof Error ? `${reason.message} Intenta nuevamente; no se modificó el formulario.` : "No se pudo analizar la foto. Intenta nuevamente.");
       setSuggestedCategory(null);
-      Alert.alert("Continúa manualmente", reason instanceof Error ? reason.message : "No se pudo analizar la foto. Puedes llenar los datos normalmente.");
     } finally {
       setAnalyzingImage(false);
     }
